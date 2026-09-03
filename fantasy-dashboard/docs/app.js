@@ -1,4 +1,4 @@
-const POLL_MS = 30000;
+const POLL_MS = 15000;
 const OVERRIDE_STORAGE_KEY = "ffMatchupOverrideV1";
 
 const $ = (sel) => document.querySelector(sel);
