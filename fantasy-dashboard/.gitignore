@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+npm-debug.log*
+.DS_Store
+
+# Large, unused local snapshot of Sleeper's full player list (14MB+)
+data/players_nfl.json

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fantasy Matchup</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="meta" id="meta">—</div>
+      <div class="status">
+        <span class="dot" id="dot"></span>
+        <span id="status-text">Loading…</span>
+        <button id="refresh">Refresh</button>
+      </div>
+    </header>
+
+    <div class="scoreboard">
+      <div class="score-side a">
+        <div class="name" id="name-a">My Team</div>
+        <div class="pts" id="pts-a">0.0</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="score-side b">
+        <div class="name" id="name-b">Opponent</div>
+        <div class="pts" id="pts-b">0.0</div>
+      </div>
+      <div class="bar">
+        <div class="a" id="bar-a" style="width:50%"></div>
+        <div class="b" id="bar-b" style="width:50%"></div>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="team-col">
+        <h2 id="col-a-title">My Team</h2>
+        <div id="col-a"></div>
+      </div>
+      <div class="team-col">
+        <h2 id="col-b-title">Opponent</h2>
+        <div id="col-b"></div>
+      </div>
+    </div>
+
+    <footer>
+      <div id="last-updated">—</div>
+      Live stats via Sleeper · checks for new data every 30s · data refreshes server-side every 10 min
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
