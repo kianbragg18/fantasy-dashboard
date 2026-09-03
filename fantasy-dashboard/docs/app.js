@@ -111,12 +111,15 @@ function sideHtml(entry, side) {
   const key = entry.p.sleeper_id;
   const isExpanded = expandedPlayers.has(key);
   const rzBadge = entry.inRedZone ? `<span class="rz-badge">RZ</span>` : "";
+  const teamBadge = entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : "";
   const cls = side + (entry.inRedZone ? " redzone" : "") + (isExpanded ? " expanded" : "");
   return `
     <div class="mside ${cls}" data-player-id="${key}" role="button" tabindex="0" aria-expanded="${isExpanded}">
-      <div class="mpts">${entry.pts.toFixed(1)}</div>
-      <div class="mname">${entry.p.name}${entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : ""}${rzBadge}</div>
-      <div class="mline">${entry.line}</div>
+      <div class="mtop">
+        <span class="mname">${entry.p.name}${rzBadge}</span>
+        <span class="mpts">${entry.pts.toFixed(1)}</span>
+      </div>
+      <div class="mline">${teamBadge}${entry.line}</div>
       ${isExpanded ? breakdownHtml(entry.stats) : ""}
     </div>
   `;
