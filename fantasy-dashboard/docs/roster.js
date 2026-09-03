@@ -9,8 +9,12 @@
 // NOTE: this file is duplicated from ../lib/matchup.js because this is
 // the static (GitHub Pages) build — it has no server to share code with.
 // Keep both in sync when you edit your roster.
+//
+// This is only the FALLBACK roster shown before anyone sets one from a
+// photo (see roster-import.js). Once a roster is set, it's carried in
+// the page URL (#roster=...) and in this browser's localStorage instead.
 
-const MATCHUP = {
+const DEFAULT_MATCHUP = {
   season: null,
   week: null,
 

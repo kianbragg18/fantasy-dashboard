@@ -44,14 +44,78 @@
       </div>
     </div>
 
+    <details class="import-panel">
+      <summary>📷 Set rosters from a photo</summary>
+      <div class="import-body">
+        <p class="import-hint">
+          Upload a screenshot of each team's roster (Sleeper app, ESPN, Yahoo — whatever shows the player
+          names). We'll try to match the names automatically; nothing is uploaded anywhere, it's all read
+          in your browser. Check the matches below, then save to get a link you can send your friend.
+        </p>
+
+        <div class="import-team" data-team="A">
+          <label class="team-name-label">
+            Team name
+            <input type="text" class="team-name-input" value="My Team" />
+          </label>
+          <label class="file-label">
+            <input type="file" accept="image/*" class="photo-input" />
+            <span class="scan-btn">Choose photo…</span>
+          </label>
+          <div class="scan-status"></div>
+          <div class="candidate-list"></div>
+          <div class="manual-add">
+            <input type="text" class="manual-search" placeholder="Add a player manually…" />
+            <div class="manual-results"></div>
+            <div class="manual-added"></div>
+          </div>
+        </div>
+
+        <div class="import-team" data-team="B">
+          <label class="team-name-label">
+            Team name
+            <input type="text" class="team-name-input" value="Opponent" />
+          </label>
+          <label class="file-label">
+            <input type="file" accept="image/*" class="photo-input" />
+            <span class="scan-btn">Choose photo…</span>
+          </label>
+          <div class="scan-status"></div>
+          <div class="candidate-list"></div>
+          <div class="manual-add">
+            <input type="text" class="manual-search" placeholder="Add a player manually…" />
+            <div class="manual-results"></div>
+            <div class="manual-added"></div>
+          </div>
+        </div>
+
+        <div class="import-actions">
+          <button id="apply-roster">Use these rosters</button>
+          <button id="reset-roster" class="secondary" type="button">Reset to default roster</button>
+        </div>
+
+        <div class="share-link-box" id="share-link-box" hidden>
+          <label for="share-link-input">Shareable link — send this to your friend</label>
+          <div class="share-row">
+            <input type="text" id="share-link-input" readonly />
+            <button id="copy-link-btn" type="button">Copy</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
     <footer>
       <div id="last-updated">—</div>
       Live stats via Sleeper · auto-refreshes every 30s
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
+  <script src="match.js"></script>
+  <script src="players-db.js"></script>
   <script src="roster.js"></script>
   <script src="scoring.js"></script>
   <script src="app.js"></script>
+  <script src="roster-import.js"></script>
 </body>
 </html>

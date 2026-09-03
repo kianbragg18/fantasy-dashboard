@@ -1,4 +1,5 @@
 const POLL_MS = 30000;
+const OVERRIDE_STORAGE_KEY = "ffMatchupOverrideV1";
 
 // ── TEMPORARY DEMO OVERRIDE ──────────────────────────────────────────
 // Fakes James Cook's live stat line on top of whatever real (currently
@@ -13,15 +14,57 @@ const $ = (sel) => document.querySelector(sel);
 
 let pollTimer = null;
 
-async function getSeasonWeek() {
-  if (MATCHUP.season && MATCHUP.week) {
-    return { season: MATCHUP.season, week: MATCHUP.week, season_type: "regular" };
+// A roster set via the photo-upload panel lives in the URL hash (so it
+// can be shared with a link) and in localStorage (so it survives a
+// reload on the same browser without the hash). Falls back to the
+// hardcoded DEFAULT_MATCHUP from roster.js.
+function decodeRosterFromHash() {
+  const match = window.location.hash.match(/roster=([^&]+)/);
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(match[1]))));
+  } catch (err) {
+    console.warn("Could not parse roster from URL:", err);
+    return null;
+  }
+}
+
+function loadStoredOverride() {
+  try {
+    const raw = localStorage.getItem(OVERRIDE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getActiveMatchup() {
+  if (window.__ffOverride) return window.__ffOverride;
+  const fromHash = decodeRosterFromHash();
+  if (fromHash) {
+    window.__ffOverride = fromHash;
+    try {
+      localStorage.setItem(OVERRIDE_STORAGE_KEY, JSON.stringify(fromHash));
+    } catch {}
+    return fromHash;
+  }
+  const stored = loadStoredOverride();
+  if (stored) {
+    window.__ffOverride = stored;
+    return stored;
+  }
+  return DEFAULT_MATCHUP;
+}
+
+async function getSeasonWeek(matchup) {
+  if (matchup.season && matchup.week) {
+    return { season: matchup.season, week: matchup.week, season_type: "regular" };
   }
   const res = await fetch("https://api.sleeper.app/v1/state/nfl");
   const state = await res.json();
   return {
-    season: MATCHUP.season || state.season,
-    week: MATCHUP.week || state.week,
+    season: matchup.season || state.season,
+    week: matchup.week || state.week,
     season_type: state.season_type || "regular",
   };
 }
@@ -53,7 +96,7 @@ function renderPlayer(p, statsByPlayer) {
 function renderTeam(colEl, team, statsByPlayer) {
   colEl.innerHTML = "";
   if (!team.players.length) {
-    colEl.innerHTML = `<div class="empty">No roster loaded yet — send Claude a matchup photo to fill this in.</div>`;
+    colEl.innerHTML = `<div class="empty">No roster loaded yet — use "Set rosters from a photo" below.</div>`;
     return 0;
   }
   let total = 0;
@@ -73,18 +116,19 @@ async function refresh() {
   statusText.textContent = "Updating…";
 
   try {
-    const { season, week, season_type } = await getSeasonWeek();
+    const matchup = getActiveMatchup();
+    const { season, week, season_type } = await getSeasonWeek(matchup);
     $("#meta").textContent = `${season} · Week ${week}`;
 
     const stats = await fetchStats(season, week, season_type);
 
-    const totalA = renderTeam($("#col-a"), MATCHUP.teamA, stats);
-    const totalB = renderTeam($("#col-b"), MATCHUP.teamB, stats);
+    const totalA = renderTeam($("#col-a"), matchup.teamA, stats);
+    const totalB = renderTeam($("#col-b"), matchup.teamB, stats);
 
-    $("#name-a").textContent = MATCHUP.teamA.name;
-    $("#name-b").textContent = MATCHUP.teamB.name;
-    $("#col-a-title").textContent = MATCHUP.teamA.name;
-    $("#col-b-title").textContent = MATCHUP.teamB.name;
+    $("#name-a").textContent = matchup.teamA.name;
+    $("#name-b").textContent = matchup.teamB.name;
+    $("#col-a-title").textContent = matchup.teamA.name;
+    $("#col-b-title").textContent = matchup.teamB.name;
     $("#pts-a").textContent = totalA.toFixed(1);
     $("#pts-b").textContent = totalB.toFixed(1);
 
@@ -111,6 +155,10 @@ function startPolling() {
 }
 
 $("#refresh").addEventListener("click", refresh);
+
+// Exposed so roster-import.js can force a re-render right after the
+// user saves a new roster from a photo, without waiting for the poll.
+window.ffRefreshMatchup = refresh;
 
 refresh();
 startPolling();

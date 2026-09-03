@@ -207,3 +207,208 @@ footer {
   font-weight: 600;
   margin-bottom: 4px;
 }
+
+.import-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px 16px;
+  margin-top: 20px;
+}
+.import-panel summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 600;
+  font-size: 14px;
+  list-style: none;
+}
+.import-panel summary::-webkit-details-marker { display: none; }
+.import-panel[open] summary { border-bottom: 1px solid var(--border); }
+.import-body { padding: 16px 0 20px; }
+
+.import-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.import-team {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.team-name-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.team-name-label input[type="text"] {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.file-label { display: inline-block; cursor: pointer; }
+.file-label input[type="file"] {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.scan-btn {
+  display: inline-block;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.file-label:hover .scan-btn { border-color: var(--accent-a); }
+
+.scan-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+  min-height: 16px;
+}
+
+.candidate-list { margin-top: 10px; }
+.candidate-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.candidate-line {
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+.candidate-select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  max-width: 100%;
+}
+
+.manual-add { margin-top: 12px; position: relative; }
+.manual-search {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+.manual-results {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: var(--card);
+}
+.manual-result {
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.manual-result:hover { background: var(--bg); }
+.manual-result.empty { color: var(--muted); cursor: default; }
+.manual-result.empty:hover { background: none; }
+
+.manual-added { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.manual-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 6px 4px 10px;
+  font-size: 12px;
+}
+.chip-remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px;
+}
+.chip-remove:hover { color: var(--accent-b); }
+
+.import-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.import-actions button {
+  border: 1px solid var(--accent-a);
+  background: var(--accent-a);
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.import-actions button.secondary {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+  font-weight: 500;
+}
+
+.share-link-box {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.share-link-box label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.share-row { display: flex; gap: 8px; }
+.share-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+.share-row button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
