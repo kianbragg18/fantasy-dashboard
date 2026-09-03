@@ -11,7 +11,7 @@ const MATCHUP = {
   week: null,
 
   teamA: {
-    name: "My Team",
+    name: "The Orig",
     players: [
       { name: "Aaron Rodgers", sleeper_id: "96", pos: "QB", team: "PIT" },
       { name: "D'Andre Swift", sleeper_id: "6790", pos: "RB", team: "CHI" },
