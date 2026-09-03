@@ -36,11 +36,37 @@
       },
     });
     try {
-      const { data } = await worker.recognize(file);
-      return data.text || "";
+      // `blocks: true` also gets us each line's position on the image
+      // (bbox.y0) — used below to guess the team name from whatever
+      // text sits nearest the top of the screenshot.
+      const { data } = await worker.recognize(file, {}, { blocks: true });
+      return data;
     } finally {
       worker.terminate();
     }
+  }
+
+  // Screenshots from Sleeper/ESPN/Yahoo etc. usually show the team name
+  // near the top of the roster view. Flattens every OCR'd line with its
+  // vertical position, drops lines that are just a status-bar clock or
+  // too short to be a name, and returns whichever real line sits
+  // highest on the image.
+  function guessTeamName(ocrData) {
+    const lines = [];
+    for (const block of ocrData.blocks || []) {
+      for (const para of block.paragraphs || []) {
+        for (const line of para.lines || []) {
+          lines.push(line);
+        }
+      }
+    }
+    const candidates = lines
+      .map((line) => ({ text: (line.text || "").trim(), y0: line.bbox.y0 }))
+      .filter((l) => l.text.length >= 3 && l.text.length <= 40)
+      .filter((l) => /[a-zA-Z]{2,}/.test(l.text)) // must have a real word, not just a clock/icon
+      .filter((l) => !/^\d{1,2}:\d{2}\s?(AM|PM)?$/i.test(l.text)) // status-bar clock
+      .sort((a, b) => a.y0 - b.y0);
+    return candidates.length ? candidates[0].text : null;
   }
 
   function candidateRowHtml(candidate, idx) {
@@ -63,32 +89,42 @@
     `;
   }
 
-  async function handlePhoto(teamKey, file, statusEl, listEl) {
+  async function handlePhoto(teamKey, file, statusEl, listEl, nameInput) {
     listEl.innerHTML = "";
     statusEl.textContent = "Loading player list…";
     const playersDb = await ensurePlayersDb();
 
     statusEl.textContent = "Reading photo… 0%";
-    const text = await ocrImage(file, (pct) => {
+    const ocrData = await ocrImage(file, (pct) => {
       statusEl.textContent = `Reading photo… ${pct}%`;
     });
 
-    const lines = extractCandidateLines(text);
+    const teamNameGuess = guessTeamName(ocrData);
+    if (teamNameGuess && nameInput) {
+      nameInput.value = teamNameGuess;
+    }
+
+    const lines = extractCandidateLines(ocrData.text || "");
     const candidates = lines
       .map((line) => ({ line, matches: matchLine(line, playersDb, 4) }))
       .filter((c) => c.matches.length > 0);
 
     teamState[teamKey].candidates = candidates;
 
+    const nameNote = teamNameGuess
+      ? ` Guessed team name "${teamNameGuess}" from the top of the photo — check it above.`
+      : "";
+
     if (!candidates.length) {
       statusEl.textContent =
-        "Couldn't confidently match any names in that photo. Try a clearer/closer screenshot, or add players manually below.";
+        "Couldn't confidently match any names in that photo. Try a clearer/closer screenshot, or add players manually below." +
+        nameNote;
       return;
     }
 
     statusEl.textContent = `Found ${candidates.length} possible player${
       candidates.length === 1 ? "" : "s"
-    } — double check them below, then click "Use these rosters".`;
+    } — double check them below, then click "Use these rosters".${nameNote}`;
     listEl.innerHTML = candidates.map(candidateRowHtml).join("");
   }
 
@@ -147,11 +183,12 @@
     const fileInput = qs(".photo-input", container);
     const statusEl = qs(".scan-status", container);
     const listEl = qs(".candidate-list", container);
+    const nameInput = qs(".team-name-input", container);
 
     fileInput.addEventListener("change", () => {
       const file = fileInput.files[0];
       if (!file) return;
-      handlePhoto(teamKey, file, statusEl, listEl).catch((err) => {
+      handlePhoto(teamKey, file, statusEl, listEl, nameInput).catch((err) => {
         console.error(err);
         statusEl.textContent = "Something went wrong reading that photo — try again, or add players manually below.";
       });
