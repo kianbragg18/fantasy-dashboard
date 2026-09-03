@@ -3,15 +3,6 @@ const { calcPoints, formatStatLine } = require("./scoring");
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes — avoids hammering the Sleeper API
 
-// ── TEMPORARY DEMO OVERRIDE ──────────────────────────────────────────
-// Fakes James Cook's live stat line on top of whatever real (currently
-// empty, pre-season) data comes back, just to prove the scoring math
-// and UI update live. Remove this block once the season actually starts.
-const DEMO_OVERRIDE = {
-  "8138": { rush_att: 18, rush_yd: 100, rush_td: 2, rec: 4 }, // James Cook
-};
-// ──────────────────────────────────────────────────────────────────────
-
 let cache = { data: null, fetchedAt: 0 };
 
 async function getSeasonWeek() {
@@ -32,8 +23,7 @@ async function fetchStats(season, week, seasonType) {
   const url = `https://api.sleeper.app/v1/stats/nfl/${seasonType}/${season}/${week}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Stats fetch failed: ${res.status}`);
-  const data = await res.json();
-  return { ...data, ...DEMO_OVERRIDE };
+  return res.json();
 }
 
 function buildTeam(team, statsByPlayer) {
