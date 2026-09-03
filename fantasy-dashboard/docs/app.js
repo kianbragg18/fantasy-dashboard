@@ -5,6 +5,13 @@ const $ = (sel) => document.querySelector(sel);
 
 let pollTimer = null;
 
+// Which players' point breakdowns are expanded, and the data needed to
+// redraw the rows without a network refetch (kept so tapping a row to
+// expand it doesn't wait on Sleeper/ESPN, and survives real refreshes
+// since it's keyed by sleeper_id rather than tied to one render pass).
+const expandedPlayers = new Set();
+let lastRenderData = null;
+
 // A roster set via the photo-upload panel lives in the URL hash (so it
 // can be shared with a link) and in localStorage (so it survives a
 // reload on the same browser without the hash). Falls back to the
@@ -72,23 +79,45 @@ function computePlayer(p, statsByPlayer, situationsByTeam) {
   const situation = p.team && situationsByTeam[p.team];
   return {
     p,
+    stats: s,
     pts: calcPoints(s),
     line: formatStatLine(p.pos, s),
     inRedZone: !!(situation && situation.inRedZone),
   };
 }
 
+function breakdownHtml(stats) {
+  const items = pointsBreakdown(stats);
+  if (!items.length) {
+    return `<div class="mbreakdown"><div class="mbreak-empty">No scoring stats yet</div></div>`;
+  }
+  const rows = items
+    .map(
+      (item) => `
+        <div class="mbreak-row">
+          <span class="mbreak-label">${item.label}</span>
+          <span class="mbreak-raw">${item.raw}</span>
+          <span class="mbreak-pts">${item.pts >= 0 ? "+" : ""}${item.pts.toFixed(1)}</span>
+        </div>`
+    )
+    .join("");
+  return `<div class="mbreakdown">${rows}</div>`;
+}
+
 function sideHtml(entry, side) {
   if (!entry) {
     return `<div class="mside ${side} empty-slot">—</div>`;
   }
+  const key = entry.p.sleeper_id;
+  const isExpanded = expandedPlayers.has(key);
   const rzBadge = entry.inRedZone ? `<span class="rz-badge">RZ</span>` : "";
-  const cls = side + (entry.inRedZone ? " redzone" : "");
+  const cls = side + (entry.inRedZone ? " redzone" : "") + (isExpanded ? " expanded" : "");
   return `
-    <div class="mside ${cls}">
+    <div class="mside ${cls}" data-player-id="${key}" role="button" tabindex="0" aria-expanded="${isExpanded}">
       <div class="mpts">${entry.pts.toFixed(1)}</div>
       <div class="mname">${entry.p.name}${entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : ""}${rzBadge}</div>
       <div class="mline">${entry.line}</div>
+      ${isExpanded ? breakdownHtml(entry.stats) : ""}
     </div>
   `;
 }
@@ -153,6 +182,7 @@ async function refresh() {
       }),
     ]);
 
+    lastRenderData = { matchup, stats, situationsByTeam };
     const { totalA, totalB } = renderMatchupRows(
       $("#matchup-rows"),
       matchup.teamA,
@@ -189,6 +219,37 @@ function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(refresh, POLL_MS);
 }
+
+// Redraws the rows from the last fetched data (no network call) — used
+// when tapping a player to expand/collapse their point breakdown, so
+// it's instant and doesn't disturb the poll cycle.
+function rerenderRows() {
+  if (!lastRenderData) return;
+  const { matchup, stats, situationsByTeam } = lastRenderData;
+  renderMatchupRows($("#matchup-rows"), matchup.teamA, matchup.teamB, stats, situationsByTeam);
+}
+
+function toggleExpanded(playerId) {
+  if (expandedPlayers.has(playerId)) {
+    expandedPlayers.delete(playerId);
+  } else {
+    expandedPlayers.add(playerId);
+  }
+  rerenderRows();
+}
+
+$("#matchup-rows").addEventListener("click", (e) => {
+  const side = e.target.closest(".mside[data-player-id]");
+  if (side) toggleExpanded(side.dataset.playerId);
+});
+$("#matchup-rows").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const side = e.target.closest(".mside[data-player-id]");
+  if (side) {
+    e.preventDefault();
+    toggleExpanded(side.dataset.playerId);
+  }
+});
 
 $("#refresh").addEventListener("click", refresh);
 

@@ -17,6 +17,28 @@ function calcPoints(stats) {
   return pts;
 }
 
+// Same categories/math as calcPoints, but itemized — powers the
+// tap-to-expand "how were these points scored" breakdown.
+function pointsBreakdown(stats) {
+  if (!stats) return [];
+  const categories = [
+    { key: "pass_yd", label: "Pass yards", divisor: 25 },
+    { key: "pass_td", label: "Pass TD", perUnit: 6 },
+    { key: "rush_yd", label: "Rush yards", divisor: 10 },
+    { key: "rush_td", label: "Rush TD", perUnit: 6 },
+    { key: "rec", label: "Receptions", perUnit: 1 },
+    { key: "rec_yd", label: "Rec yards", divisor: 10 },
+    { key: "rec_td", label: "Rec TD", perUnit: 6 },
+  ];
+  return categories
+    .map(({ key, label, divisor, perUnit }) => {
+      const raw = stats[key] || 0;
+      const pts = divisor ? raw / divisor : raw * perUnit;
+      return { label, raw, pts };
+    })
+    .filter((item) => item.raw > 0);
+}
+
 function formatStatLine(pos, s) {
   if (!s) return "Not started";
   const parts = [];

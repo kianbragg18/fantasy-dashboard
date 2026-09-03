@@ -165,11 +165,44 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
 .mside {
   padding: 10px 12px;
   min-width: 0;
+  cursor: pointer;
 }
 .mside.left { text-align: left; }
 .mside.right { text-align: right; }
 .mside.winning { background: var(--win-bg); }
 .mside.redzone { background: var(--rz-bg); }
+.mside:hover { filter: brightness(0.97); }
+.mside:active { filter: brightness(0.94); }
+.mside:focus-visible { outline: 2px solid var(--accent-a); outline-offset: -2px; }
+
+.mbreakdown {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.mbreak-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  padding: 2px 0;
+}
+.mside.right .mbreak-row { flex-direction: row-reverse; }
+.mbreak-label { color: var(--muted); }
+.mbreak-raw { color: var(--text); font-variant-numeric: tabular-nums; }
+.mbreak-pts {
+  font-weight: 700;
+  color: var(--accent-a);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
+}
+.mside.right .mbreak-pts { text-align: left; }
+.mbreak-empty {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
 
 .rz-badge {
   display: inline-block;
