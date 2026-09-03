@@ -260,5 +260,19 @@ $("#refresh").addEventListener("click", refresh);
 // user saves a new roster from a photo, without waiting for the poll.
 window.ffRefreshMatchup = refresh;
 
+// When cloud sync is configured (firebase-config.js), whichever roster
+// was last saved from either phone becomes the shared source of truth
+// — this fires immediately with whatever's already saved, then again
+// on every future change, from either device, in real time.
+if (isCloudSyncEnabled()) {
+  watchMatchupFromCloud((matchup) => {
+    window.__ffOverride = matchup;
+    try {
+      localStorage.setItem(OVERRIDE_STORAGE_KEY, JSON.stringify(matchup));
+    } catch {}
+    refresh();
+  });
+}
+
 refresh();
 startPolling();

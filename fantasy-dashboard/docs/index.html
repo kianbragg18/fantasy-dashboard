@@ -51,8 +51,9 @@
         <p class="import-hint">
           Upload a screenshot of each team's roster (Sleeper app, ESPN, Yahoo — whatever shows the player
           names). We'll try to match the names automatically; nothing is uploaded anywhere, it's all read
-          in your browser. Check the matches below, then save to get a link you can send your friend.
+          in your browser. Check the matches below, then save.
         </p>
+        <p class="import-hint sync-status" id="sync-status"></p>
 
         <div class="import-team" data-team="A">
           <label class="team-name-label">
@@ -96,7 +97,7 @@
         </div>
 
         <div class="share-link-box" id="share-link-box" hidden>
-          <label for="share-link-input">Shareable link — send this to your friend</label>
+          <label for="share-link-input" id="share-link-label">Shareable link — send this to your friend</label>
           <div class="share-row">
             <input type="text" id="share-link-input" readonly />
             <button id="copy-link-btn" type="button">Copy</button>
@@ -111,6 +112,10 @@
     </footer>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="sync.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
   <script src="match.js"></script>
   <script src="players-db.js"></script>

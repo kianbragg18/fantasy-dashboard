@@ -237,11 +237,31 @@
     } catch {}
     history.replaceState(null, "", "#roster=" + encodeRoster(matchup));
     if (typeof window.ffRefreshMatchup === "function") window.ffRefreshMatchup();
+
+    // When cloud sync is set up, this pushes the roster to every open
+    // tab automatically (see sync.js) — the copied link below still
+    // works too, as a manual fallback or for a device that hasn't
+    // opened the page yet.
+    if (isCloudSyncEnabled()) {
+      saveMatchupToCloud(matchup).catch((err) => {
+        console.warn("Could not save roster to cloud (non-fatal):", err.message);
+      });
+    }
   }
 
   function init() {
     initTeamPanel("A");
     initTeamPanel("B");
+
+    const syncStatusEl = qs("#sync-status");
+    const shareLinkLabel = qs("#share-link-label");
+    if (isCloudSyncEnabled()) {
+      syncStatusEl.textContent = "☁️ Cloud sync is on — saving here updates your friend's page automatically.";
+      shareLinkLabel.textContent = "Backup link (in case their page hasn't loaded yet)";
+    } else {
+      syncStatusEl.textContent = "";
+      shareLinkLabel.textContent = "Shareable link — send this to your friend";
+    }
 
     qs("#apply-roster").addEventListener("click", () => {
       const teamAContainer = qs('.import-team[data-team="A"]');

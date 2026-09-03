@@ -336,6 +336,10 @@ footer {
   margin: 0 0 16px;
   line-height: 1.5;
 }
+.import-hint.sync-status:not(:empty) {
+  color: var(--live);
+  font-weight: 600;
+}
 
 .import-team {
   border: 1px dashed var(--border);
