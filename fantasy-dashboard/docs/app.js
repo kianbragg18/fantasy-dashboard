@@ -67,35 +67,62 @@ async function fetchStats(season, week, seasonType) {
   return res.json();
 }
 
-function renderPlayer(p, statsByPlayer) {
+function computePlayer(p, statsByPlayer) {
   const s = statsByPlayer[p.sleeper_id];
-  const pts = calcPoints(s);
-  const line = formatStatLine(p.pos, s);
-  const el = document.createElement("div");
-  el.className = "player";
-  el.innerHTML = `
-    <div class="info">
-      <div class="pname">${p.name}<span class="badge">${p.pos}${p.team ? " · " + p.team : ""}</span></div>
-      <div class="line">${line}</div>
-    </div>
-    <div class="pts">${pts.toFixed(1)}</div>
-  `;
-  return { el, pts };
+  return { p, pts: calcPoints(s), line: formatStatLine(p.pos, s) };
 }
 
-function renderTeam(colEl, team, statsByPlayer) {
-  colEl.innerHTML = "";
-  if (!team.players.length) {
-    colEl.innerHTML = `<div class="empty">No roster loaded yet — use "Set rosters from a photo" below.</div>`;
-    return 0;
+function sideHtml(entry, side) {
+  if (!entry) {
+    return `<div class="mside ${side} empty-slot">—</div>`;
   }
-  let total = 0;
-  for (const p of team.players) {
-    const { el, pts } = renderPlayer(p, statsByPlayer);
-    colEl.appendChild(el);
-    total += pts;
+  return `
+    <div class="mside ${side}">
+      <div class="mpts">${entry.pts.toFixed(1)}</div>
+      <div class="mname">${entry.p.name}${entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : ""}</div>
+      <div class="mline">${entry.line}</div>
+    </div>
+  `;
+}
+
+// Pairs each team's players up by roster slot (index) so, e.g., teamA's
+// first RB lines up against teamB's first RB — mirrors how fantasy apps
+// show a matchup as one row per position rather than two stacked lists.
+function renderMatchupRows(container, teamA, teamB, statsByPlayer) {
+  container.innerHTML = "";
+  const rowCount = Math.max(teamA.players.length, teamB.players.length);
+
+  if (!rowCount) {
+    container.innerHTML = `<div class="empty">No roster loaded yet — use "Set rosters from a photo" below.</div>`;
+    return { totalA: 0, totalB: 0 };
   }
-  return total;
+
+  let totalA = 0;
+  let totalB = 0;
+
+  for (let i = 0; i < rowCount; i++) {
+    const pa = teamA.players[i];
+    const pb = teamB.players[i];
+    const ca = pa ? computePlayer(pa, statsByPlayer) : null;
+    const cb = pb ? computePlayer(pb, statsByPlayer) : null;
+    if (ca) totalA += ca.pts;
+    if (cb) totalB += cb.pts;
+
+    const pos = (pa && pa.pos) || (pb && pb.pos) || "";
+    const aWins = ca && cb && ca.pts > cb.pts;
+    const bWins = ca && cb && cb.pts > ca.pts;
+
+    const row = document.createElement("div");
+    row.className = "mrow";
+    row.innerHTML = `
+      ${sideHtml(ca, "left" + (aWins ? " winning" : bWins ? " losing" : ""))}
+      <div class="mpos">${pos}</div>
+      ${sideHtml(cb, "right" + (bWins ? " winning" : aWins ? " losing" : ""))}
+    `;
+    container.appendChild(row);
+  }
+
+  return { totalA, totalB };
 }
 
 async function refresh() {
@@ -112,13 +139,12 @@ async function refresh() {
 
     const stats = await fetchStats(season, week, season_type);
 
-    const totalA = renderTeam($("#col-a"), matchup.teamA, stats);
-    const totalB = renderTeam($("#col-b"), matchup.teamB, stats);
+    const { totalA, totalB } = renderMatchupRows($("#matchup-rows"), matchup.teamA, matchup.teamB, stats);
 
     $("#name-a").textContent = matchup.teamA.name;
     $("#name-b").textContent = matchup.teamB.name;
-    $("#col-a-title").textContent = matchup.teamA.name;
-    $("#col-b-title").textContent = matchup.teamB.name;
+    $("#avatar-a").textContent = matchup.teamA.name.trim().charAt(0).toUpperCase() || "A";
+    $("#avatar-b").textContent = matchup.teamB.name.trim().charAt(0).toUpperCase() || "B";
     $("#pts-a").textContent = totalA.toFixed(1);
     $("#pts-b").textContent = totalB.toFixed(1);
 
