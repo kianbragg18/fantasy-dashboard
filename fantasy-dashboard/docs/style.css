@@ -1,26 +1,14 @@
 :root {
-  color-scheme: light dark;
-  --bg: #f5f6f8;
+  color-scheme: light;
+  --bg: #ffffff;
   --card: #ffffff;
-  --border: #e2e4e9;
-  --text: #16181d;
+  --border: #e5e7eb;
+  --text: #14171a;
   --muted: #6b7280;
-  --accent-a: #2563eb;
-  --accent-b: #dc2626;
+  --accent-a: #2f6fed;
+  --accent-b: #e5484d;
+  --win-bg: #e7f8ec;
   --live: #16a34a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1115;
-    --card: #181b21;
-    --border: #2a2e37;
-    --text: #f2f3f5;
-    --muted: #9198a8;
-    --accent-a: #5b8dfb;
-    --accent-b: #f16565;
-    --live: #34d399;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -178,6 +166,7 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
 }
 .mside.left { text-align: left; }
 .mside.right { text-align: right; }
+.mside.winning { background: var(--win-bg); }
 
 .mpts {
   font-weight: 700;
@@ -185,9 +174,7 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-.mside.winning .mpts { color: var(--text); }
-.mside.left.winning .mpts { color: var(--accent-a); }
-.mside.right.winning .mpts { color: var(--accent-b); }
+.mside.winning .mpts { color: var(--text); font-weight: 800; }
 
 .mname {
   font-size: 13px;
