@@ -8,6 +8,8 @@
   --accent-a: #2f6fed;
   --accent-b: #e5484d;
   --win-bg: #e7f8ec;
+  --rz-bg: #fff1e0;
+  --rz-accent: #ea580c;
   --live: #16a34a;
 }
 
@@ -167,6 +169,27 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
 .mside.left { text-align: left; }
 .mside.right { text-align: right; }
 .mside.winning { background: var(--win-bg); }
+.mside.redzone { background: var(--rz-bg); }
+
+.rz-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--rz-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  animation: rz-pulse 1.6s infinite;
+}
+.mside.right .rz-badge { margin-left: 0; margin-right: 4px; }
+
+@keyframes rz-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
 
 .mpts {
   font-weight: 700;

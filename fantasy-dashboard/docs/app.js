@@ -67,19 +67,27 @@ async function fetchStats(season, week, seasonType) {
   return res.json();
 }
 
-function computePlayer(p, statsByPlayer) {
+function computePlayer(p, statsByPlayer, situationsByTeam) {
   const s = statsByPlayer[p.sleeper_id];
-  return { p, pts: calcPoints(s), line: formatStatLine(p.pos, s) };
+  const situation = p.team && situationsByTeam[p.team];
+  return {
+    p,
+    pts: calcPoints(s),
+    line: formatStatLine(p.pos, s),
+    inRedZone: !!(situation && situation.inRedZone),
+  };
 }
 
 function sideHtml(entry, side) {
   if (!entry) {
     return `<div class="mside ${side} empty-slot">—</div>`;
   }
+  const rzBadge = entry.inRedZone ? `<span class="rz-badge">RZ</span>` : "";
+  const cls = side + (entry.inRedZone ? " redzone" : "");
   return `
-    <div class="mside ${side}">
+    <div class="mside ${cls}">
       <div class="mpts">${entry.pts.toFixed(1)}</div>
-      <div class="mname">${entry.p.name}${entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : ""}</div>
+      <div class="mname">${entry.p.name}${entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : ""}${rzBadge}</div>
       <div class="mline">${entry.line}</div>
     </div>
   `;
@@ -88,7 +96,7 @@ function sideHtml(entry, side) {
 // Pairs each team's players up by roster slot (index) so, e.g., teamA's
 // first RB lines up against teamB's first RB — mirrors how fantasy apps
 // show a matchup as one row per position rather than two stacked lists.
-function renderMatchupRows(container, teamA, teamB, statsByPlayer) {
+function renderMatchupRows(container, teamA, teamB, statsByPlayer, situationsByTeam) {
   container.innerHTML = "";
   const rowCount = Math.max(teamA.players.length, teamB.players.length);
 
@@ -103,8 +111,8 @@ function renderMatchupRows(container, teamA, teamB, statsByPlayer) {
   for (let i = 0; i < rowCount; i++) {
     const pa = teamA.players[i];
     const pb = teamB.players[i];
-    const ca = pa ? computePlayer(pa, statsByPlayer) : null;
-    const cb = pb ? computePlayer(pb, statsByPlayer) : null;
+    const ca = pa ? computePlayer(pa, statsByPlayer, situationsByTeam) : null;
+    const cb = pb ? computePlayer(pb, statsByPlayer, situationsByTeam) : null;
     if (ca) totalA += ca.pts;
     if (cb) totalB += cb.pts;
 
@@ -137,9 +145,21 @@ async function refresh() {
     const { season, week, season_type } = await getSeasonWeek(matchup);
     $("#meta").textContent = `${season} · Week ${week}`;
 
-    const stats = await fetchStats(season, week, season_type);
+    const [stats, situationsByTeam] = await Promise.all([
+      fetchStats(season, week, season_type),
+      fetchGameSituations().catch((err) => {
+        console.warn("Red zone data unavailable (non-fatal):", err.message);
+        return {};
+      }),
+    ]);
 
-    const { totalA, totalB } = renderMatchupRows($("#matchup-rows"), matchup.teamA, matchup.teamB, stats);
+    const { totalA, totalB } = renderMatchupRows(
+      $("#matchup-rows"),
+      matchup.teamA,
+      matchup.teamB,
+      stats,
+      situationsByTeam
+    );
 
     $("#name-a").textContent = matchup.teamA.name;
     $("#name-b").textContent = matchup.teamB.name;
