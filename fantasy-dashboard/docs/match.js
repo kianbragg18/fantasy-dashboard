@@ -61,12 +61,41 @@ function scorePlayer(norm, player) {
   // (e.g. "KJ Hill" out-scoring the real "Tyreek Hill" for a "T Hill"
   // query, or "A.J. Brown" out-scoring "Amon-Ra St. Brown" for "A St
   // Brown", purely because their names are closer in length).
-  if (player.lastNorm && norm.endsWith(" " + player.lastNorm)) {
-    const prefix = norm.slice(0, norm.length - player.lastNorm.length - 1).trim();
-    if (prefix && player.firstNorm && (prefix === player.firstNorm || player.firstNorm.startsWith(prefix))) {
-      return 0.93;
+  //
+  // The last name itself is matched with a little edit-distance
+  // tolerance rather than requiring an exact string match — a real
+  // photo (screen glare, compression, a small font) reliably OCRs a
+  // single bold initial correctly but can drop a character in a
+  // longer surname, and an exact-match requirement there would reject
+  // the correct player outright instead of just scoring it lower.
+  if (player.lastNorm) {
+    const lastWords = player.lastNorm.split(" ");
+    const normWords = norm.split(" ");
+    // The last name can appear anywhere in the line, not just at the
+    // very end — a row's status text ("4th 3:38 21-27 @ LAR") can leak
+    // in as trailing noise after the real name — so every possible
+    // window of the right length is checked for the closest fuzzy
+    // match to the player's last name, rather than assuming the last
+    // `lastWords.length` words are it.
+    let best = null;
+    for (let i = 0; i + lastWords.length <= normWords.length; i++) {
+      if (i === 0 && normWords.length === lastWords.length) continue; // no room for a first name/initial
+      const window = normWords.slice(i, i + lastWords.length).join(" ");
+      const sim = window === player.lastNorm ? 1 : similarity(window, player.lastNorm);
+      if (!best || sim > best.sim) best = { index: i, sim };
     }
-    return 0; // shares a last name, but the first name/initial doesn't match
+    if (best && (best.sim === 1 || (player.lastNorm.length >= 4 && best.sim >= 0.85))) {
+      // Only the word right before the last name has to match — a
+      // matchup screen's position label sits close to the name and can
+      // partially survive OCR as a stray leading word (e.g. a blurred
+      // "QB" read as just "B", leaving "b j herbert"); that shouldn't
+      // sink an otherwise-correct match.
+      const closestWord = normWords[best.index - 1];
+      if (closestWord && player.firstNorm && (closestWord === player.firstNorm || player.firstNorm.startsWith(closestWord))) {
+        return 0.9 * best.sim + 0.03;
+      }
+      return 0; // shares a last name, but the first name/initial doesn't match
+    }
   }
 
   return similarity(norm, player.norm);

@@ -109,22 +109,47 @@
     return candidates.length ? candidates[0] : null;
   }
 
-  // Loads a File just far enough to read its pixel dimensions, so line
-  // positions (in pixels) can be compared against the photo's midpoint.
-  function getImageWidth(file) {
+  function loadImage(file) {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
         URL.revokeObjectURL(url);
-        resolve(img.naturalWidth);
+        resolve(img);
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        reject(new Error("Could not read photo dimensions"));
+        reject(new Error("Could not read that photo"));
       };
       img.src = url;
     });
+  }
+
+  // OCR accuracy on small text (a phone screenshot with two full
+  // rosters crammed side by side) drops off fast below a certain pixel
+  // width — small text reads noisier, more characters get misread, and
+  // more real players end up below the match-confidence bar below.
+  // Upscaling a small photo onto a canvas before handing it to
+  // Tesseract is a standard fix for that; a photo already wider than
+  // this is left alone.
+  const MIN_OCR_WIDTH = 1600;
+
+  async function prepareImageForOcr(file) {
+    const img = await loadImage(file);
+    if (img.naturalWidth >= MIN_OCR_WIDTH) {
+      return { source: img, width: img.naturalWidth };
+    }
+    const scale = MIN_OCR_WIDTH / img.naturalWidth;
+    const width = Math.round(img.naturalWidth * scale);
+    const height = Math.round(img.naturalHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, width, height);
+    return { source: canvas, width };
   }
 
   // Matches each OCR'd line on one side against the player list and
@@ -205,13 +230,12 @@
     statusEl.textContent = "Loading player list…";
     const playersDb = await ensurePlayersDb();
 
+    const { source, width: imageWidth } = await prepareImageForOcr(file);
+
     statusEl.textContent = "Reading photo… 0%";
-    const [ocrData, imageWidth] = await Promise.all([
-      ocrImage(file, (pct) => {
-        statusEl.textContent = `Reading photo… ${pct}%`;
-      }),
-      getImageWidth(file),
-    ]);
+    const ocrData = await ocrImage(source, (pct) => {
+      statusEl.textContent = `Reading photo… ${pct}%`;
+    });
 
     const lines = flattenOcrLines(ocrData);
     const { left, right } = splitLinesBySide(lines, imageWidth / 2);
