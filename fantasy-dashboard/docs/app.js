@@ -80,14 +80,14 @@ function computePlayer(p, statsByPlayer, situationsByTeam) {
   return {
     p,
     stats: s,
-    pts: calcPoints(s),
+    pts: calcPoints(s, p.pos),
     line: formatStatLine(p.pos, s),
     inRedZone: !!(situation && situation.inRedZone),
   };
 }
 
-function breakdownHtml(stats) {
-  const items = pointsBreakdown(stats);
+function breakdownHtml(stats, pos) {
+  const items = pointsBreakdown(stats, pos);
   if (!items.length) {
     return `<div class="mbreakdown"><div class="mbreak-empty">No scoring stats yet</div></div>`;
   }
@@ -120,7 +120,7 @@ function sideHtml(entry, side) {
         <span class="mpts">${entry.pts.toFixed(1)}</span>
       </div>
       <div class="mline">${teamBadge}${entry.line}</div>
-      ${isExpanded ? breakdownHtml(entry.stats) : ""}
+      ${isExpanded ? breakdownHtml(entry.stats, entry.p.pos) : ""}
     </div>
   `;
 }
