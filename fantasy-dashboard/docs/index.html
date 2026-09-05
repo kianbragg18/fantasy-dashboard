@@ -50,9 +50,8 @@
       <div class="import-body">
         <p class="import-hint">
           Upload one screenshot of the matchup screen — your team on the left, your opponent's on the
-          right (Sleeper's matchup view works great). We'll split the photo down the middle and match
-          each side's names automatically; nothing is uploaded anywhere, it's all read in your browser.
-          Check the matches below, then save.
+          right (Sleeper's matchup view works great). We'll read both rosters and apply them
+          automatically; nothing is uploaded anywhere, it's all read in your browser.
         </p>
         <p class="import-hint sync-status" id="sync-status"></p>
 
@@ -62,34 +61,18 @@
         </label>
         <div class="scan-status" id="matchup-scan-status"></div>
 
-        <div class="import-team" data-team="A">
-          <label class="team-name-label">
-            Team name (left side)
-            <input type="text" class="team-name-input" value="The Orig" />
-          </label>
-          <div class="candidate-list"></div>
-          <div class="manual-add">
-            <input type="text" class="manual-search" placeholder="Add a player manually…" />
-            <div class="manual-results"></div>
-            <div class="manual-added"></div>
+        <div class="detected-rosters" id="detected-rosters" hidden>
+          <div class="detected-team">
+            <div class="detected-team-name" id="detected-name-a"></div>
+            <ul class="detected-players" id="detected-players-a"></ul>
           </div>
-        </div>
-
-        <div class="import-team" data-team="B">
-          <label class="team-name-label">
-            Team name (right side)
-            <input type="text" class="team-name-input" value="Opponent" />
-          </label>
-          <div class="candidate-list"></div>
-          <div class="manual-add">
-            <input type="text" class="manual-search" placeholder="Add a player manually…" />
-            <div class="manual-results"></div>
-            <div class="manual-added"></div>
+          <div class="detected-team">
+            <div class="detected-team-name" id="detected-name-b"></div>
+            <ul class="detected-players" id="detected-players-b"></ul>
           </div>
         </div>
 
         <div class="import-actions">
-          <button id="apply-roster">Use these rosters</button>
           <button id="reset-roster" class="secondary" type="button">Reset to default roster</button>
         </div>
 
