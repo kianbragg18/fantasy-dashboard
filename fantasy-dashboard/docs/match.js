@@ -109,11 +109,20 @@ function scorePlayer(norm, player) {
   return similarity(norm, player.norm);
 }
 
-function matchLine(lineText, playersDb, topN = 3) {
+// teamHint, when given, is a team abbreviation read from the line next
+// to this one (see extractTeamAbbr) — it can't override a strong name
+// match, but it's decisive when two candidates are otherwise tied.
+function matchLine(lineText, playersDb, topN = 3, teamHint = null) {
   const norm = normalize(lineText);
   if (norm.length < 3) return [];
   const scored = playersDb
-    .map((p) => ({ player: p, score: scorePlayer(norm, p) }))
+    .map((p) => {
+      let score = scorePlayer(norm, p);
+      if (teamHint && p.team) {
+        score = p.team === teamHint ? Math.min(0.99, score + 0.08) : score * 0.5;
+      }
+      return { player: p, score };
+    })
     .filter((s) => s.score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score);
   return scored.slice(0, topN);
@@ -135,12 +144,16 @@ function stripStrayPositionLabel(line) {
   return line;
 }
 
+function cleanLineText(raw) {
+  const line = raw.replace(/[^a-zA-Z.'\- ]/g, " ").replace(/\s+/g, " ").trim();
+  return stripStrayPositionLabel(line);
+}
+
 function extractCandidateLines(ocrText) {
   const seen = new Set();
   const lines = [];
   for (const raw of ocrText.split(/\n+/)) {
-    let line = raw.replace(/[^a-zA-Z.'\- ]/g, " ").replace(/\s+/g, " ").trim();
-    line = stripStrayPositionLabel(line);
+    const line = cleanLineText(raw);
     if (line.length < 3 || line.length > 40) continue;
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
@@ -150,6 +163,45 @@ function extractCandidateLines(ocrText) {
   return lines;
 }
 
+// A matchup screen prints each player's team under (or beside) their
+// name — e.g. "PHI" under Saquon Barkley — which is the one piece of
+// context OCR can actually read that a name alone can't give: two
+// unrelated players sharing an initial and last name (DJ Moore, WR
+// BUF vs. David Moore, WR CAR) score identically on name text alone.
+const TEAM_ABBRS = new Set([
+  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN",
+  "DET", "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA",
+  "MIN", "NE", "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB",
+  "TEN", "WAS",
+]);
+
+function extractTeamAbbr(rawLine) {
+  const words = cleanLineText(rawLine).toUpperCase().split(" ").filter(Boolean);
+  for (const w of words) {
+    if (TEAM_ABBRS.has(w)) return w;
+  }
+  return null;
+}
+
+// A line that's just a team code (plus maybe a position label, e.g.
+// "WR PHI") is context for the name line next to it, not a name
+// candidate in its own right — matching it against the player list
+// would just add noise.
+function isTeamTagLine(cleanedLine) {
+  if (!extractTeamAbbr(cleanedLine)) return false;
+  return cleanedLine.split(" ").filter(Boolean).length <= 2;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { normalize, levenshtein, similarity, matchLine, extractCandidateLines };
+  module.exports = {
+    normalize,
+    levenshtein,
+    similarity,
+    matchLine,
+    extractCandidateLines,
+    cleanLineText,
+    extractTeamAbbr,
+    isTeamTagLine,
+    TEAM_ABBRS,
+  };
 }

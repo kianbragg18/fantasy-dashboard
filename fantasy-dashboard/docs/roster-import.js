@@ -164,16 +164,31 @@
   const AUTO_ACCEPT_MIN_SCORE = 0.7;
 
   function playersForSide(sideLines, playersDb) {
-    const lines = extractCandidateLines(sideLines.map((l) => l.text).join("\n"));
+    // Cleaned in original top-to-bottom order (not deduped/rejoined like
+    // extractCandidateLines does) so a name line stays adjacent to its
+    // own team-tag line below it — that adjacency is what lets a team
+    // hint be attributed to the right player.
+    const cleaned = sideLines.map((l) => cleanLineText(l.text));
     const players = [];
-    for (const line of lines) {
+    for (let i = 0; i < cleaned.length; i++) {
+      const line = cleaned[i];
+      if (!line || line.length < 3 || line.length > 40) continue;
+      if (isTeamTagLine(line)) continue; // this line IS the context, not a name
+
       // A leftover team-abbreviation fragment (e.g. "LAC") is short
       // enough to land as a substring inside an unrelated player's
       // name (e.g. "Flacco") and still clear the score bar above — so
       // lines too short to plausibly be a real name are skipped before
       // matching at all, rather than trusted on score alone.
       if (normalize(line).length < 4) continue;
-      const matches = matchLine(line, playersDb, 1);
+
+      let teamHint = null;
+      for (let j = i + 1; j <= i + 2 && j < cleaned.length; j++) {
+        teamHint = extractTeamAbbr(cleaned[j] || "");
+        if (teamHint) break;
+      }
+
+      const matches = matchLine(line, playersDb, 1, teamHint);
       if (matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE) players.push(matches[0].player);
     }
     return players;
