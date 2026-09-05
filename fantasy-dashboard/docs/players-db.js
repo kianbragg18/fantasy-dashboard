@@ -4,7 +4,7 @@
 // fetch it once, strip it down to the fields we need, and cache the
 // slim result in localStorage.
 
-const PLAYERS_CACHE_KEY = "ffPlayersDbV1";
+const PLAYERS_CACHE_KEY = "ffPlayersDbV2";
 const PLAYERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FANTASY_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K", "DEF"]);
 
@@ -41,6 +41,7 @@ function slimPlayer(id, p) {
     pos,
     team: p.team || null,
     norm: normalize(name),
+    firstNorm: normalize(p.first_name || name.split(" ")[0]),
     lastNorm: normalize(p.last_name || name.split(" ").slice(-1)[0]),
   };
 }

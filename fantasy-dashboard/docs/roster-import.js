@@ -129,13 +129,27 @@
 
   // Matches each OCR'd line on one side against the player list and
   // keeps only the best match per line — the whole flow is automatic,
-  // so there's no dropdown to pick between alternates.
+  // so there's no dropdown to pick between alternates. A matchup photo
+  // packs in a lot of non-name text (team/position codes, game clocks,
+  // scores) that inevitably ends up as a "candidate line" too; unlike
+  // a real name, that text only ever scores weakly (well under 0.6 in
+  // testing), so requiring high confidence here — well above
+  // matchLine's own loose generation threshold — is what keeps that
+  // noise out of the roster instead of being silently misapplied.
+  const AUTO_ACCEPT_MIN_SCORE = 0.7;
+
   function playersForSide(sideLines, playersDb) {
     const lines = extractCandidateLines(sideLines.map((l) => l.text).join("\n"));
     const players = [];
     for (const line of lines) {
+      // A leftover team-abbreviation fragment (e.g. "LAC") is short
+      // enough to land as a substring inside an unrelated player's
+      // name (e.g. "Flacco") and still clear the score bar above — so
+      // lines too short to plausibly be a real name are skipped before
+      // matching at all, rather than trusted on score alone.
+      if (normalize(line).length < 4) continue;
       const matches = matchLine(line, playersDb, 1);
-      if (matches.length) players.push(matches[0].player);
+      if (matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE) players.push(matches[0].player);
     }
     return players;
   }

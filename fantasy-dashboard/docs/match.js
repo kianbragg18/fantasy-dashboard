@@ -50,10 +50,26 @@ function scorePlayer(norm, player) {
     const lenRatio = Math.min(norm.length, player.norm.length) / Math.max(norm.length, player.norm.length);
     return 0.75 + 0.2 * lenRatio;
   }
-  const full = similarity(norm, player.norm);
-  const lastNameOnly = player.lastNorm && (norm === player.lastNorm || norm.endsWith(" " + player.lastNorm));
-  const lastBoost = lastNameOnly ? 0.25 : 0;
-  return Math.min(0.94, full + lastBoost);
+
+  if (norm === player.lastNorm) return 0.85; // query is just the last name
+
+  // Matchup screens abbreviate to "first-initial lastname" (e.g. "T
+  // Hill"), and OCR sometimes drops a first name outright. Either way,
+  // whatever precedes a shared last name should be a genuine prefix of
+  // the player's real first name — otherwise raw edit-distance favors
+  // whichever real player just happens to have a *short* full name
+  // (e.g. "KJ Hill" out-scoring the real "Tyreek Hill" for a "T Hill"
+  // query, or "A.J. Brown" out-scoring "Amon-Ra St. Brown" for "A St
+  // Brown", purely because their names are closer in length).
+  if (player.lastNorm && norm.endsWith(" " + player.lastNorm)) {
+    const prefix = norm.slice(0, norm.length - player.lastNorm.length - 1).trim();
+    if (prefix && player.firstNorm && (prefix === player.firstNorm || player.firstNorm.startsWith(prefix))) {
+      return 0.93;
+    }
+    return 0; // shares a last name, but the first name/initial doesn't match
+  }
+
+  return similarity(norm, player.norm);
 }
 
 function matchLine(lineText, playersDb, topN = 3) {
@@ -66,11 +82,28 @@ function matchLine(lineText, playersDb, topN = 3) {
   return scored.slice(0, topN);
 }
 
+// A matchup screen's position label ("QB", "WR"...) sits between the
+// two rosters, right around the photo's midpoint — so it can end up
+// tacked onto the start or end of whichever side's line it's closest
+// to, e.g. "QB J. Herbert". Left in place, that breaks the
+// first-initial abbreviation check below (it no longer looks like
+// "<initial> <lastname>"), so it's stripped before matching.
+const POSITION_LABELS = new Set(["qb", "rb", "wr", "te", "k", "dst", "def", "flex"]);
+
+function stripStrayPositionLabel(line) {
+  const words = line.split(" ");
+  if (words.length < 2) return line;
+  if (POSITION_LABELS.has(words[0].toLowerCase())) return words.slice(1).join(" ").trim();
+  if (POSITION_LABELS.has(words[words.length - 1].toLowerCase())) return words.slice(0, -1).join(" ").trim();
+  return line;
+}
+
 function extractCandidateLines(ocrText) {
   const seen = new Set();
   const lines = [];
   for (const raw of ocrText.split(/\n+/)) {
-    const line = raw.replace(/[^a-zA-Z.'\- ]/g, " ").replace(/\s+/g, " ").trim();
+    let line = raw.replace(/[^a-zA-Z.'\- ]/g, " ").replace(/\s+/g, " ").trim();
+    line = stripStrayPositionLabel(line);
     if (line.length < 3 || line.length > 40) continue;
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
