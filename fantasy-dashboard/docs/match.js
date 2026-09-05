@@ -92,7 +92,15 @@ function scorePlayer(norm, player) {
       // sink an otherwise-correct match.
       const closestWord = normWords[best.index - 1];
       if (closestWord && player.firstNorm && (closestWord === player.firstNorm || player.firstNorm.startsWith(closestWord))) {
-        return 0.9 * best.sim + 0.03;
+        // A longer last name is stronger, more specific evidence than a
+        // short one — without this, a query like "J Smith Njigba" ties
+        // "Jaxon Smith-Njigba" (2-word last name, matched in full) with
+        // every unrelated "J* Smith" player (1-word last name, matched
+        // against only part of the query), and the tie gets broken by
+        // arbitrary array order instead of by which match is actually
+        // more complete.
+        const lengthBonus = 0.03 * (lastWords.length - 1);
+        return Math.min(0.99, 0.9 * best.sim + 0.03 + lengthBonus);
       }
       return 0; // shares a last name, but the first name/initial doesn't match
     }
