@@ -11,14 +11,11 @@
 // shared via a copied link) — cloud sync is entirely optional and
 // turns on automatically once this is filled in.
 
-const FIREBASE_CONFIG = null;
-
-// Example, once you've created a project (see chat for setup steps):
-// const FIREBASE_CONFIG = {
-//   apiKey: "AIzaSy...",
-//   authDomain: "your-project.firebaseapp.com",
-//   projectId: "your-project",
-//   storageBucket: "your-project.appspot.com",
-//   messagingSenderId: "123456789",
-//   appId: "1:123456789:web:abcdef123456",
-// };
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDcNTkgjTGSYa9Oqd23DJDg6MtsoTy12Xw",
+  authDomain: "wordle-sim-491202.firebaseapp.com",
+  projectId: "wordle-sim-491202",
+  storageBucket: "wordle-sim-491202.firebasestorage.app",
+  messagingSenderId: "918652555028",
+  appId: "1:918652555028:web:27573886526296f58f7c01",
+};
