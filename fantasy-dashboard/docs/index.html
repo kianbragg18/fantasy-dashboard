@@ -46,25 +46,27 @@
     <div class="matchup-rows" id="matchup-rows"></div>
 
     <details class="import-panel">
-      <summary>📷 Set rosters from a photo</summary>
+      <summary>📷 Set rosters from a matchup photo</summary>
       <div class="import-body">
         <p class="import-hint">
-          Upload a screenshot of each team's roster (Sleeper app, ESPN, Yahoo — whatever shows the player
-          names). We'll try to match the names automatically; nothing is uploaded anywhere, it's all read
-          in your browser. Check the matches below, then save.
+          Upload one screenshot of the matchup screen — your team on the left, your opponent's on the
+          right (Sleeper's matchup view works great). We'll split the photo down the middle and match
+          each side's names automatically; nothing is uploaded anywhere, it's all read in your browser.
+          Check the matches below, then save.
         </p>
         <p class="import-hint sync-status" id="sync-status"></p>
 
+        <label class="file-label">
+          <input type="file" accept="image/*" id="matchup-photo-input" />
+          <span class="scan-btn">Choose matchup photo…</span>
+        </label>
+        <div class="scan-status" id="matchup-scan-status"></div>
+
         <div class="import-team" data-team="A">
           <label class="team-name-label">
-            Team name
+            Team name (left side)
             <input type="text" class="team-name-input" value="The Orig" />
           </label>
-          <label class="file-label">
-            <input type="file" accept="image/*" class="photo-input" />
-            <span class="scan-btn">Choose photo…</span>
-          </label>
-          <div class="scan-status"></div>
           <div class="candidate-list"></div>
           <div class="manual-add">
             <input type="text" class="manual-search" placeholder="Add a player manually…" />
@@ -75,14 +77,9 @@
 
         <div class="import-team" data-team="B">
           <label class="team-name-label">
-            Team name
+            Team name (right side)
             <input type="text" class="team-name-input" value="Opponent" />
           </label>
-          <label class="file-label">
-            <input type="file" accept="image/*" class="photo-input" />
-            <span class="scan-btn">Choose photo…</span>
-          </label>
-          <div class="scan-status"></div>
           <div class="candidate-list"></div>
           <div class="manual-add">
             <input type="text" class="manual-search" placeholder="Add a player manually…" />
