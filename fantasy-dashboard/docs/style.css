@@ -271,7 +271,6 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
   text-overflow: ellipsis;
 }
 .mline .mteam { margin-right: 4px; }
-.mside.right .mline .mteam { margin-right: 0; margin-left: 4px; }
 
 .mpos {
   text-align: center;
