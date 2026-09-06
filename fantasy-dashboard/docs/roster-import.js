@@ -92,21 +92,49 @@
     return { left, right };
   }
 
-  // Screenshots from Sleeper/ESPN/Yahoo etc. usually show the team name
-  // near the top of each side of the roster view. Drops lines that are
-  // just a status-bar clock or too short to be a name, and returns
-  // whichever real line sits highest on that side of the image — as
-  // the line object itself, so the caller can exclude it from player
-  // matching (a team name can otherwise coincidentally fuzzy-match a
-  // real player or defense, e.g. a team named "...Bears" matching the
-  // Chicago Bears D/ST).
-  function pickTeamNameLine(lines) {
-    const candidates = lines
+  // The big projected-score number ("89.42") sits directly under the
+  // team name with nothing in between, on both Sleeper- and
+  // Yahoo-style layouts — a much closer, more reliable anchor than the
+  // roster itself: a full, uncropped screenshot stacks a whole stack of
+  // other real text between the team name and the first player row
+  // (the live score, "Projected"/win% labels, a week selector) that
+  // would otherwise win a "closest line above the roster" search.
+  function isBigScoreLine(rawText) {
+    return /^\d{1,3}\.\d{1,2}$/.test(rawText.trim());
+  }
+
+  function findScoreLineY0(sideLines) {
+    const hit = sideLines.find((l) => isBigScoreLine(l.text));
+    return hit ? hit.y0 : null;
+  }
+
+  // The team name sits directly above where that side's roster starts
+  // — but "directly above" is relative to the roster, not to the top
+  // of the photo. A full, uncropped screenshot (phone status bar, nav
+  // title, tab bar) stacks real header text above the team name too,
+  // so "whichever real line sits highest on the page" — which worked
+  // for a tightly-cropped roster view — grabs that header instead once
+  // there's more page above the matchup. Anchoring to `beforeY0`
+  // (preferably the big score line, falling back to the first player
+  // this side actually matched) fixes that: the search only looks
+  // above that anchor, and prefers the closest line to it.
+  // beforeY0 == null (neither anchor found) falls back to topmost.
+  function pickTeamNameLine(sideLines, beforeY0) {
+    const candidates = sideLines
+      .map((l) => ({ text: cleanLineText(l.text), y0: l.y0 }))
       .filter((l) => l.text.length >= 3 && l.text.length <= 40)
       .filter((l) => /[a-zA-Z]{2,}/.test(l.text)) // must have a real word, not just a clock/icon
       .filter((l) => !/^\d{1,2}:\d{2}\s?(AM|PM)?$/i.test(l.text)) // status-bar clock
-      .sort((a, b) => a.y0 - b.y0);
-    return candidates.length ? candidates[0] : null;
+      .filter((l) => !isTeamTagLine(l.text));
+    if (!candidates.length) return null;
+
+    const above = beforeY0 != null ? candidates.filter((l) => l.y0 < beforeY0) : [];
+    if (above.length) {
+      above.sort((a, b) => b.y0 - a.y0); // closest line above the roster
+      return above[0];
+    }
+    const sorted = [...candidates].sort((a, b) => a.y0 - b.y0);
+    return sorted[0]; // fallback: topmost real line on this side
   }
 
   function loadImage(file) {
@@ -163,15 +191,21 @@
   // noise out of the roster instead of being silently misapplied.
   const AUTO_ACCEPT_MIN_SCORE = 0.7;
 
+  // Returns each match along with its line's y0 (rather than just the
+  // player) so the caller can both find where the roster starts on the
+  // page (for pickTeamNameLine) and exclude whichever line turns out to
+  // be the team name from the final roster — a team name can otherwise
+  // coincidentally fuzzy-match a real player or defense (e.g. a team
+  // named "...Bears" matching the Chicago Bears D/ST).
   function playersForSide(sideLines, playersDb) {
     // Cleaned in original top-to-bottom order (not deduped/rejoined like
     // extractCandidateLines does) so a name line stays adjacent to its
     // own team-tag line below it — that adjacency is what lets a team
     // hint be attributed to the right player.
-    const cleaned = sideLines.map((l) => cleanLineText(l.text));
-    const players = [];
+    const cleaned = sideLines.map((l) => ({ text: cleanLineText(l.text), y0: l.y0 }));
+    const matched = [];
     for (let i = 0; i < cleaned.length; i++) {
-      const line = cleaned[i];
+      const { text: line, y0 } = cleaned[i];
       if (!line || line.length < 3 || line.length > 40) continue;
       if (isTeamTagLine(line)) continue; // this line IS the context, not a name
 
@@ -184,14 +218,16 @@
 
       let teamHint = null;
       for (let j = i + 1; j <= i + 2 && j < cleaned.length; j++) {
-        teamHint = extractTeamAbbr(cleaned[j] || "");
+        teamHint = extractTeamAbbr(cleaned[j].text || "");
         if (teamHint) break;
       }
 
       const matches = matchLine(line, playersDb, 1, teamHint);
-      if (matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE) players.push(matches[0].player);
+      if (matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE) {
+        matched.push({ player: matches[0].player, y0 });
+      }
     }
-    return players;
+    return matched;
   }
 
   function toMatchupPlayer(p) {
@@ -255,10 +291,20 @@
     const lines = flattenOcrLines(ocrData);
     const { left, right } = splitLinesBySide(lines, imageWidth / 2);
 
-    const nameLineA = pickTeamNameLine(left);
-    const nameLineB = pickTeamNameLine(right);
-    const playersA = playersForSide(left.filter((l) => l !== nameLineA), playersDb);
-    const playersB = playersForSide(right.filter((l) => l !== nameLineB), playersDb);
+    const matchedA = playersForSide(left, playersDb);
+    const matchedB = playersForSide(right, playersDb);
+    const firstY0A = matchedA.length ? Math.min(...matchedA.map((m) => m.y0)) : null;
+    const firstY0B = matchedB.length ? Math.min(...matchedB.map((m) => m.y0)) : null;
+    const boundaryA = findScoreLineY0(left) ?? firstY0A;
+    const boundaryB = findScoreLineY0(right) ?? firstY0B;
+
+    const nameLineA = pickTeamNameLine(left, boundaryA);
+    const nameLineB = pickTeamNameLine(right, boundaryB);
+    // A team name occasionally scores well enough against the player
+    // list to slip into `matched` itself (see playersForSide) — drop it
+    // from the roster now that it's been claimed as the team name.
+    const playersA = matchedA.filter((m) => !nameLineA || m.y0 !== nameLineA.y0).map((m) => m.player);
+    const playersB = matchedB.filter((m) => !nameLineB || m.y0 !== nameLineB.y0).map((m) => m.player);
 
     if (!playersA.length && !playersB.length) {
       statusEl.textContent = "Couldn't confidently match any names in that photo — try a clearer, less cropped screenshot.";
