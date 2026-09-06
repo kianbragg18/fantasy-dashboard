@@ -110,17 +110,20 @@ function scorePlayer(norm, player) {
 }
 
 // teamHint, when given, is a team abbreviation read from the line next
-// to this one (see extractTeamAbbr) — it can't override a strong name
-// match, but it's decisive when two candidates are otherwise tied.
+// to this one (see extractTeamAbbr). It's boost-only, never a penalty:
+// the hint line is a guess about which line belongs to which player,
+// and OCR noise means that guess is sometimes wrong or attached to the
+// wrong row. A wrong hint should just fail to help — it must never be
+// able to sink an otherwise-correct match's score, or a single
+// misattributed team line silently drops a real player from the
+// roster. It's only decisive when two candidates are otherwise tied.
 function matchLine(lineText, playersDb, topN = 3, teamHint = null) {
   const norm = normalize(lineText);
   if (norm.length < 3) return [];
   const scored = playersDb
     .map((p) => {
       let score = scorePlayer(norm, p);
-      if (teamHint && p.team) {
-        score = p.team === teamHint ? Math.min(0.99, score + 0.08) : score * 0.5;
-      }
+      if (teamHint && p.team === teamHint) score = Math.min(0.99, score + 0.08);
       return { player: p, score };
     })
     .filter((s) => s.score >= MIN_SCORE)
@@ -186,10 +189,17 @@ function extractTeamAbbr(rawLine) {
 // A line that's just a team code (plus maybe a position label, e.g.
 // "WR PHI") is context for the name line next to it, not a name
 // candidate in its own right — matching it against the player list
-// would just add noise.
+// would just add noise. Every word besides the team code itself has to
+// be a known position label — just checking "2 words or fewer" would
+// also catch a real two-word name whose first word happens to collide
+// with a team code (e.g. an initial pair like "TB" in "TB Hightower"),
+// and skip a real player instead of scoring them.
 function isTeamTagLine(cleanedLine) {
-  if (!extractTeamAbbr(cleanedLine)) return false;
-  return cleanedLine.split(" ").filter(Boolean).length <= 2;
+  const words = cleanedLine.split(" ").filter(Boolean);
+  if (!words.length || words.length > 2) return false;
+  const abbrWord = words.find((w) => TEAM_ABBRS.has(w.toUpperCase()));
+  if (!abbrWord) return false;
+  return words.every((w) => w === abbrWord || POSITION_LABELS.has(w.toLowerCase()));
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -203,5 +213,6 @@ if (typeof module !== "undefined" && module.exports) {
     extractTeamAbbr,
     isTeamTagLine,
     TEAM_ABBRS,
+    POSITION_LABELS,
   };
 }
