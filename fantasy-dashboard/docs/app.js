@@ -151,15 +151,13 @@ function renderMatchupRows(container, teamA, teamB, statsByPlayer, situationsByT
     if (cb) totalB += cb.pts;
 
     const pos = (pa && pa.pos) || (pb && pb.pos) || "";
-    const aWins = ca && cb && ca.pts > cb.pts;
-    const bWins = ca && cb && cb.pts > ca.pts;
 
     const row = document.createElement("div");
     row.className = "mrow";
     row.innerHTML = `
-      ${sideHtml(ca, "left" + (aWins ? " winning" : bWins ? " losing" : ""))}
+      ${sideHtml(ca, "left")}
       <div class="mpos">${pos}</div>
-      ${sideHtml(cb, "right" + (bWins ? " winning" : aWins ? " losing" : ""))}
+      ${sideHtml(cb, "right")}
     `;
     container.appendChild(row);
   }

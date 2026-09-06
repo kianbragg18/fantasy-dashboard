@@ -7,7 +7,6 @@
   --muted: #6b7280;
   --accent-a: #2f6fed;
   --accent-b: #e5484d;
-  --win-bg: #e7f8ec;
   --rz-bg: #fff1e0;
   --rz-accent: #ea580c;
   --live: #16a34a;
@@ -175,7 +174,6 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
 }
 .mside.left { text-align: left; }
 .mside.right { text-align: right; }
-.mside.winning { background: var(--win-bg); }
 .mside.redzone { background: var(--rz-bg); }
 .mside:hover { filter: brightness(0.97); }
 .mside:active { filter: brightness(0.94); }
@@ -245,7 +243,6 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-.mside.winning .mpts { color: var(--text); font-weight: 800; }
 
 .mname {
   flex: 1 1 auto;
