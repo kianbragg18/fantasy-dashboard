@@ -272,6 +272,16 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
 }
 .mline .mteam { margin-right: 4px; }
 
+.mgame {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.8;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mpos {
   text-align: center;
   font-size: 11px;

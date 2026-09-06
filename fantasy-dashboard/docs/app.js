@@ -83,6 +83,7 @@ function computePlayer(p, statsByPlayer, situationsByTeam) {
     pts: calcPoints(s, p.pos),
     line: formatStatLine(p.pos, s),
     inRedZone: !!(situation && situation.inRedZone),
+    gameStatus: situation ? formatGameStatus(situation) : null,
   };
 }
 
@@ -120,6 +121,7 @@ function sideHtml(entry, side) {
         <span class="mpts">${entry.pts.toFixed(1)}</span>
       </div>
       <div class="mline">${teamBadge}${entry.line}</div>
+      ${entry.gameStatus ? `<div class="mgame">${entry.gameStatus}</div>` : ""}
       ${isExpanded ? breakdownHtml(entry.stats, entry.p.pos) : ""}
     </div>
   `;
