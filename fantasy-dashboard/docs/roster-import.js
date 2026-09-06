@@ -99,13 +99,30 @@
   // other real text between the team name and the first player row
   // (the live score, "Projected"/win% labels, a week selector) that
   // would otherwise win a "closest line above the roster" search.
+  // A real OCR'd score line is rarely a clean, isolated "89.42" — it's
+  // often stuck to stray noise from a nearby icon or the "/" divider,
+  // so this only requires the pattern to appear _somewhere_ in the
+  // line rather than requiring an exact whole-line match.
   function isBigScoreLine(rawText) {
-    return /^\d{1,3}\.\d{1,2}$/.test(rawText.trim());
+    return /\d{1,3}\.\d{1,2}/.test(rawText.trim());
   }
 
   function findScoreLineY0(sideLines) {
     const hit = sideLines.find((l) => isBigScoreLine(l.text));
     return hit ? hit.y0 : null;
+  }
+
+  // Stock UI text that every fantasy app's matchup screen carries near
+  // the roster — a week selector, "Projected"/win% labels, a scoring
+  // log link — and that OCR reads just as cleanly as a real team name.
+  // Recognizing it by content, not just position, is what keeps it out
+  // even when the positional anchors below miss (e.g. a noisy photo
+  // where the score line doesn't parse and the search falls back to
+  // "closest line above the roster", which these rows sit closest to).
+  const UI_CHROME_PATTERNS = [/\bweek\b/i, /\bmatchup/i, /scoring\s*log/i, /\bprojected\b/i, /\bwin\s*%/i];
+
+  function looksLikeUiChrome(text) {
+    return UI_CHROME_PATTERNS.some((re) => re.test(text));
   }
 
   // The team name sits directly above where that side's roster starts
@@ -124,8 +141,14 @@
       .map((l) => ({ text: cleanLineText(l.text), y0: l.y0 }))
       .filter((l) => l.text.length >= 3 && l.text.length <= 40)
       .filter((l) => /[a-zA-Z]{2,}/.test(l.text)) // must have a real word, not just a clock/icon
+      // A team's small logo/avatar sits right at the score's height, not
+      // the name's, but a garbled OCR read of it (e.g. ". Mm") is still
+      // short enough to slip past the length check above — a real team
+      // name has more actual letters in it than that.
+      .filter((l) => (l.text.match(/[a-zA-Z]/g) || []).length >= 3)
       .filter((l) => !/^\d{1,2}:\d{2}\s?(AM|PM)?$/i.test(l.text)) // status-bar clock
-      .filter((l) => !isTeamTagLine(l.text));
+      .filter((l) => !isTeamTagLine(l.text))
+      .filter((l) => !looksLikeUiChrome(l.text));
     if (!candidates.length) return null;
 
     const above = beforeY0 != null ? candidates.filter((l) => l.y0 < beforeY0) : [];
