@@ -7,7 +7,7 @@
   --muted: #6b7280;
   --accent-a: #2f6fed;
   --accent-b: #e5484d;
-  --rz-bg: #fff1e0;
+  --rz-bg: #fde2e2;
   --rz-accent: #ea580c;
   --onfield-bg: #e3f6e8;
   --live: #16a34a;
@@ -184,10 +184,10 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
 }
 .mside.left { text-align: left; }
 .mside.right { text-align: right; }
-.mside.redzone { background: var(--rz-bg); }
-/* On the field right now. Red zone players are on the field too, so
-   green wins there; the pulsing RZ badge still marks the red zone. */
+/* On the field right now: light green. A red zone player is on the
+   field too, so the red zone rule comes after and wins: light red. */
 .mside.onfield { background: var(--onfield-bg); }
+.mside.redzone { background: var(--rz-bg); }
 .mside:hover { filter: brightness(0.97); }
 .mside:active { filter: brightness(0.94); }
 .mside:focus-visible { outline: 2px solid var(--accent-a); outline-offset: -2px; }
