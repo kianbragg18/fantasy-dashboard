@@ -2,6 +2,7 @@
 // Passing / rushing / receiving TD = 6 pts each
 // 10 rushing/receiving yards = 1 pt
 // 25 passing yards = 1 pt
+// Interception thrown = -1 pt
 // Reception = 1 pt (full PPR)
 // Kicker: FG <40yd = 3, 40-49yd = 4, 50+yd = 5, PAT made = 1,
 // missed FG or PAT = -1 each.
@@ -74,6 +75,7 @@ function calcPoints(stats, pos) {
   let pts = 0;
   pts += (stats.pass_yd || 0) / 25;
   pts += (stats.pass_td || 0) * 6;
+  pts -= (stats.pass_int || 0) * 1;
   pts += (stats.rush_yd || 0) / 10;
   pts += (stats.rush_td || 0) * 6;
   pts += (stats.rec || 0) * 1;
@@ -128,6 +130,7 @@ function pointsBreakdown(stats, pos) {
   const categories = [
     { key: "pass_yd", label: "Pass yards", divisor: 25 },
     { key: "pass_td", label: "Pass TD", perUnit: 6 },
+    { key: "pass_int", label: "Interceptions", perUnit: -1 },
     { key: "rush_yd", label: "Rush yards", divisor: 10 },
     { key: "rush_td", label: "Rush TD", perUnit: 6 },
     { key: "rec", label: "Receptions", perUnit: 1 },

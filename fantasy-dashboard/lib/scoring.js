@@ -2,6 +2,7 @@
 // Passing / rushing / receiving TD = 6 pts each
 // 10 rushing/receiving yards = 1 pt
 // 25 passing yards = 1 pt
+// Interception thrown = -1 pt
 // Reception = 1 pt (full PPR)
 
 function calcPoints(stats) {
@@ -9,6 +10,7 @@ function calcPoints(stats) {
   let pts = 0;
   pts += (stats.pass_yd || 0) / 25;
   pts += (stats.pass_td || 0) * 6;
+  pts -= (stats.pass_int || 0) * 1;
   pts += (stats.rush_yd || 0) / 10;
   pts += (stats.rush_td || 0) * 6;
   pts += (stats.rec || 0) * 1;
