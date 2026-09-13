@@ -83,6 +83,7 @@ function computePlayer(p, statsByPlayer, situationsByTeam) {
     pts: calcPoints(s, p.pos),
     line: formatStatLine(p.pos, s),
     inRedZone: !!(situation && situation.inRedZone),
+    onField: isOnField(situation, p.pos),
     gameStatus: situation ? formatGameStatus(situation) : null,
   };
 }
@@ -113,7 +114,11 @@ function sideHtml(entry, side) {
   const isExpanded = expandedPlayers.has(key);
   const rzBadge = entry.inRedZone ? `<span class="rz-badge">RZ</span>` : "";
   const teamBadge = entry.p.team ? `<span class="mteam">${entry.p.team}</span>` : "";
-  const cls = side + (entry.inRedZone ? " redzone" : "") + (isExpanded ? " expanded" : "");
+  const cls =
+    side +
+    (entry.onField ? " onfield" : "") +
+    (entry.inRedZone ? " redzone" : "") +
+    (isExpanded ? " expanded" : "");
   return `
     <div class="mside ${cls}" data-player-id="${key}" role="button" tabindex="0" aria-expanded="${isExpanded}">
       <div class="mtop">
