@@ -166,6 +166,15 @@ button#refresh:disabled { opacity: 0.5; cursor: default; }
   border-top: 1px solid var(--border);
 }
 .mrow:first-child { border-top: none; }
+.mrow.bench { background: #f1f3f8; }
+.mrow.bench .mpts { color: var(--muted); }
+.mrow.bench .mpos {
+  justify-self: center;
+  background: #5f6577;
+  color: #fff;
+  border-radius: 6px;
+  padding: 3px 6px;
+}
 
 .mside {
   padding: 10px 12px;

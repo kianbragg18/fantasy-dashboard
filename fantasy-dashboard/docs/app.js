@@ -130,6 +130,8 @@ function sideHtml(entry, side) {
 // Pairs each team's players up by roster slot (index) so, e.g., teamA's
 // first RB lines up against teamB's first RB — mirrors how fantasy apps
 // show a matchup as one row per position rather than two stacked lists.
+// A slot can be null (that side of the row wasn't read from the photo).
+// Bench players (`bench: true`) are shown but don't count toward totals.
 function renderMatchupRows(container, teamA, teamB, statsByPlayer, situationsByTeam) {
   container.innerHTML = "";
   const rowCount = Math.max(teamA.players.length, teamB.players.length);
@@ -147,13 +149,14 @@ function renderMatchupRows(container, teamA, teamB, statsByPlayer, situationsByT
     const pb = teamB.players[i];
     const ca = pa ? computePlayer(pa, statsByPlayer, situationsByTeam) : null;
     const cb = pb ? computePlayer(pb, statsByPlayer, situationsByTeam) : null;
-    if (ca) totalA += ca.pts;
-    if (cb) totalB += cb.pts;
+    const isBench = !!((pa && pa.bench) || (pb && pb.bench));
+    if (ca && !isBench) totalA += ca.pts;
+    if (cb && !isBench) totalB += cb.pts;
 
-    const pos = (pa && pa.pos) || (pb && pb.pos) || "";
+    const pos = isBench ? "BN" : (pa && pa.pos) || (pb && pb.pos) || "";
 
     const row = document.createElement("div");
-    row.className = "mrow";
+    row.className = "mrow" + (isBench ? " bench" : "");
     row.innerHTML = `
       ${sideHtml(ca, "left")}
       <div class="mpos">${pos}</div>

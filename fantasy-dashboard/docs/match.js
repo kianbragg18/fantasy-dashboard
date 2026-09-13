@@ -148,7 +148,15 @@ function stripStrayPositionLabel(line) {
 }
 
 function cleanLineText(raw) {
-  const line = raw.replace(/[^a-zA-Z.'\- ]/g, " ").replace(/\s+/g, " ").trim();
+  const line = raw
+    .replace(/[^a-zA-Z.'\- ]/g, " ")
+    // OCR regularly drops the space in a bold all-caps "T. LAWRENCE",
+    // reading one word "T.LAWRENCE" that no longer looks like an
+    // initial + last name, and likewise glues a suffix on ("BURDENIII").
+    .replace(/\b([A-Z])\.(?=[A-Z]{2})/g, "$1. ")
+    .replace(/\b([A-Z]{3,})(III|JR|SR)\b/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
   return stripStrayPositionLabel(line);
 }
 
@@ -202,6 +210,22 @@ function isTeamTagLine(cleanedLine) {
   return words.every((w) => w === abbrWord || POSITION_LABELS.has(w.toLowerCase()));
 }
 
+// A looser version of isTeamTagLine for the line under a player's name
+// on a matchup screen ("WR • DEN" plus that row's projected score, which
+// OCR often mangles into letters, e.g. "13.93" → "B393"). Any line that
+// carries both a position label and a team code is that row's context
+// line, never a name — fuzzy-matching its leftovers (e.g. "WR DEN B")
+// otherwise invents a player (it came out as "Camden Brown"). Takes the
+// raw OCR text: cleanLineText would already have stripped the leading
+// position label this check relies on.
+function looksLikeTagLine(rawLine) {
+  const words = rawLine.replace(/[^a-zA-Z ]/g, " ").split(" ").filter(Boolean);
+  return (
+    words.some((w) => POSITION_LABELS.has(w.toLowerCase())) &&
+    words.some((w) => TEAM_ABBRS.has(w.toUpperCase()))
+  );
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     normalize,
@@ -212,6 +236,7 @@ if (typeof module !== "undefined" && module.exports) {
     cleanLineText,
     extractTeamAbbr,
     isTeamTagLine,
+    looksLikeTagLine,
     TEAM_ABBRS,
     POSITION_LABELS,
   };

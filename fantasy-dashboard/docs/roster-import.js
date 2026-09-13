@@ -3,10 +3,12 @@
 // Tesseract.js — nothing is uploaded anywhere) showing both rosters
 // side by side — your team on the left, your opponent's on the right.
 // A roster too long for one screen can be split across several shots;
-// their players are merged in order with duplicates dropped.
+// their rows are merged with duplicates dropped.
 // Each detected line is bucketed to a side by its horizontal position
 // in the photo, fuzzy-matched against Sleeper's player list, and the
-// roster is applied automatically from the best match — no manual
+// two sides are paired into rows by height on the photo (each row
+// flagged starter or bench from its center badge). The roster is
+// applied automatically from the best match — no manual
 // confirmation step. The result is encoded into the page URL
 // (#roster=...) so it can be shared with a link, and mirrored into
 // localStorage so it survives a reload on this browser.
@@ -61,6 +63,7 @@
             x0: line.bbox.x0,
             x1: line.bbox.x1,
             y0: line.bbox.y0,
+            y1: line.bbox.y1,
             words: (line.words || []).map((w) => ({
               text: (w.text || "").trim(),
               x0: w.bbox.x0,
@@ -88,8 +91,8 @@
         const center = (w.x0 + w.x1) / 2;
         (center < midX ? leftWords : rightWords).push(w.text);
       }
-      if (leftWords.length) left.push({ text: leftWords.join(" "), y0: line.y0 });
-      if (rightWords.length) right.push({ text: rightWords.join(" "), y0: line.y0 });
+      if (leftWords.length) left.push({ text: leftWords.join(" "), y0: line.y0, y1: line.y1 });
+      if (rightWords.length) right.push({ text: rightWords.join(" "), y0: line.y0, y1: line.y1 });
     }
     return { left, right };
   }
@@ -121,7 +124,16 @@
   // even when the positional anchors below miss (e.g. a noisy photo
   // where the score line doesn't parse and the search falls back to
   // "closest line above the roster", which these rows sit closest to).
-  const UI_CHROME_PATTERNS = [/\bweek\b/i, /\bmatchup/i, /scoring\s*log/i, /\bprojected\b/i, /\bwin\s*%/i];
+  const UI_CHROME_PATTERNS = [
+    /\bweek\b/i,
+    /\bmatchup/i,
+    /scoring\s*log/i,
+    /\bprojected\b/i,
+    /\bwin\s*%/i,
+    // The app's tab bar ("Team  Matchup  Players  League"), which is
+    // all a scrolled-down screenshot has above its first player row.
+    /^(team|players|league|\s)+$/i,
+  ];
 
   function looksLikeUiChrome(text) {
     return UI_CHROME_PATTERNS.some((re) => re.test(text));
@@ -184,25 +196,50 @@
   // more real players end up below the match-confidence bar below.
   // Upscaling a small photo onto a canvas before handing it to
   // Tesseract is a standard fix for that; a photo already wider than
-  // this is left alone.
+  // this keeps its size. It's drawn onto a canvas either way so its
+  // pixels can be read back too (see isBenchRow).
   const MIN_OCR_WIDTH = 1600;
 
   async function prepareImageForOcr(file) {
     const img = await loadImage(file);
-    if (img.naturalWidth >= MIN_OCR_WIDTH) {
-      return { source: img, width: img.naturalWidth };
-    }
-    const scale = MIN_OCR_WIDTH / img.naturalWidth;
+    const scale = Math.max(1, MIN_OCR_WIDTH / img.naturalWidth);
     const width = Math.round(img.naturalWidth * scale);
     const height = Math.round(img.naturalHeight * scale);
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, 0, 0, width, height);
-    return { source: canvas, width };
+    return { canvas, width };
+  }
+
+  // A bench row's center column holds a solid dark-gray "BN" badge,
+  // where a starter's badge is a pale pill with colored text ("QB",
+  // "WRT", "DEF"…). OCR can't be trusted to read "BN" (white on dark
+  // comes out as "on |"), but the badge itself is easy to see: count
+  // the dark, colorless pixels in a box at the center of the row, just
+  // below the top of the name line. A starter's colored label text is
+  // saturated, so it doesn't count toward that.
+  const BENCH_BADGE_MIN_FRACTION = 0.3;
+
+  function isBenchRow(canvas, y0, lineHeight) {
+    const x = Math.round(canvas.width * 0.47);
+    const w = Math.round(canvas.width * 0.06);
+    const y = Math.round(y0 + lineHeight * 0.5);
+    const h = Math.round(lineHeight * 2);
+    if (w < 1 || h < 1 || y + h > canvas.height) return false;
+    const { data } = canvas.getContext("2d", { willReadFrequently: true }).getImageData(x, y, w, h);
+    let dark = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum < 140 && Math.max(r, g, b) - Math.min(r, g, b) < 45) dark++;
+    }
+    return dark / (data.length / 4) >= BENCH_BADGE_MIN_FRACTION;
   }
 
   // Matches each OCR'd line on one side against the player list and
@@ -227,12 +264,12 @@
     // extractCandidateLines does) so a name line stays adjacent to its
     // own team-tag line below it — that adjacency is what lets a team
     // hint be attributed to the right player.
-    const cleaned = sideLines.map((l) => ({ text: cleanLineText(l.text), y0: l.y0 }));
+    const cleaned = sideLines.map((l) => ({ text: cleanLineText(l.text), y0: l.y0, y1: l.y1 }));
     const matched = [];
     for (let i = 0; i < cleaned.length; i++) {
-      const { text: line, y0 } = cleaned[i];
+      const { text: line, y0, y1 } = cleaned[i];
       if (!line || line.length < 3 || line.length > 40) continue;
-      if (isTeamTagLine(line)) continue; // this line IS the context, not a name
+      if (isTeamTagLine(line) || looksLikeTagLine(sideLines[i].text)) continue; // this line IS the context, not a name
 
       // A leftover team-abbreviation fragment (e.g. "LAC") is short
       // enough to land as a substring inside an unrelated player's
@@ -248,15 +285,74 @@
       }
 
       const matches = matchLine(line, playersDb, 1, teamHint);
-      if (matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE) {
-        matched.push({ player: matches[0].player, y0 });
+      let player = matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE ? matches[0].player : null;
+      if (!player && teamHint) player = matchInitialOnTeam(line, teamHint, playersDb);
+      if (player) {
+        // `tagged`: the team code under this line agrees with the match,
+        // which is strong evidence it's a real roster row — used to keep
+        // such a line from being mistaken for a team name.
+        matched.push({ player, y0, y1, tagged: player.team === teamHint });
       }
     }
     return matched;
   }
 
-  function toMatchupPlayer(p) {
-    return { name: p.name, sleeper_id: p.id, pos: p.pos, team: p.team };
+  // Fallback for an "X. LASTNAME" line whose surname OCR mangled past
+  // the fuzzy matcher's bar: the team code read under it narrows the
+  // field to one NFL roster, where the initial plus a loose surname
+  // match is enough to be sure.
+  function matchInitialOnTeam(line, team, playersDb) {
+    const words = normalize(line).split(" ");
+    if (words.length < 2 || words[0].length !== 1) return null;
+    const initial = words[0];
+    const rest = words.slice(1).join("");
+    let best = null;
+    for (const p of playersDb) {
+      if (p.team !== team || !p.firstNorm.startsWith(initial) || !p.lastNorm) continue;
+      const last = p.lastNorm.replace(/ /g, "");
+      const sim = rest.startsWith(last) ? 1 : similarity(rest, last);
+      if (sim >= 0.7 && (!best || sim > best.sim)) best = { p, sim };
+    }
+    return best ? best.p : null;
+  }
+
+  // Lines up the two sides' matched players into matchup rows by height
+  // on the photo — each row's left and right player share a baseline —
+  // so a name missed on one side leaves a gap in that row instead of
+  // shifting every player below it into the wrong row.
+  function pairRows(matchedA, matchedB) {
+    const rows = matchedA.map((m) => ({ a: m, b: null }));
+    for (const m of matchedB) {
+      let best = null;
+      for (const row of rows) {
+        if (row.b) continue;
+        const tolerance = 1.5 * Math.max(m.y1 - m.y0, row.a.y1 - row.a.y0);
+        const dist = Math.abs(row.a.y0 - m.y0);
+        if (dist <= tolerance && (!best || dist < best.dist)) best = { row, dist };
+      }
+      if (best) best.row.b = m;
+      else rows.push({ a: null, b: m });
+    }
+    return rows
+      .map((row) => {
+        const sides = [row.a, row.b].filter(Boolean);
+        return {
+          a: row.a && row.a.player,
+          b: row.b && row.b.player,
+          y0: Math.min(...sides.map((s) => s.y0)),
+          lineHeight: Math.max(...sides.map((s) => s.y1 - s.y0)),
+        };
+      })
+      .sort((r1, r2) => r1.y0 - r2.y0);
+  }
+
+  // A roster slot is null when that side of a row couldn't be read, so
+  // both teams' arrays stay aligned row for row (see app.js).
+  function toMatchupPlayer(p, bench) {
+    if (!p) return null;
+    const slot = { name: p.name, sleeper_id: p.id, pos: p.pos, team: p.team };
+    if (bench) slot.bench = true;
+    return slot;
   }
 
   function encodeRoster(matchup) {
@@ -289,7 +385,8 @@
   }
 
   function playerLineHtml(p) {
-    return `<li>${p.name} — ${p.pos}${p.team ? " " + p.team : ""}</li>`;
+    if (!p) return `<li class="missing">— not read —</li>`;
+    return `<li>${p.name} — ${p.bench ? "BN · " : ""}${p.pos}${p.team ? " " + p.team : ""}</li>`;
   }
 
   function renderDetected(matchup) {
@@ -301,42 +398,71 @@
     el.hidden = false;
   }
 
-  // Reads one side of one photo. `allowNameFallback` controls whether a
-  // team name may be guessed without the big score line to anchor on:
-  // fine for a single photo, but a scrolled-down continuation shot has
-  // no header at all, so the "topmost line" fallback would claim (and
-  // drop) whichever player happens to sit at the top of it.
-  function readSide(sideLines, playersDb, allowNameFallback) {
+  // Reads one photo into matchup rows plus each side's team-name guess.
+  function readPhoto(canvas, ocrData, playersDb) {
+    const lines = flattenOcrLines(ocrData);
+    const { left, right } = splitLinesBySide(lines, canvas.width / 2);
+    const sideA = readSide(left, playersDb);
+    const sideB = readSide(right, playersDb);
+    const rows = pairRows(sideA.matched, sideB.matched);
+    for (const row of rows) row.bench = isBenchRow(canvas, row.y0, row.lineHeight);
+    return { rows, nameA: sideA.name, nameB: sideB.name };
+  }
+
+  function readSide(sideLines, playersDb) {
     const matched = playersForSide(sideLines, playersDb);
     const scoreY0 = findScoreLineY0(sideLines);
     const firstY0 = matched.length ? Math.min(...matched.map((m) => m.y0)) : null;
-    const nameLine =
-      scoreY0 != null || allowNameFallback ? pickTeamNameLine(sideLines, scoreY0 ?? firstY0) : null;
-    // A team name occasionally scores well enough against the player
-    // list to slip into `matched` itself (see playersForSide) — drop it
-    // from the roster now that it's been claimed as the team name.
-    const players = matched.filter((m) => !nameLine || m.y0 !== nameLine.y0).map((m) => m.player);
-    return { players, nameLine, hasHeader: scoreY0 != null };
+    // A line confirmed as a player by its team code can't be the team name.
+    const taggedY0s = new Set(matched.filter((m) => m.tagged).map((m) => m.y0));
+    const nameLine = pickTeamNameLine(
+      sideLines.filter((l) => !taggedY0s.has(l.y0)),
+      scoreY0 ?? firstY0
+    );
+    // An unconfirmed match on the line claimed as the team name is
+    // likely the team name fuzzy-matching a player (a team named
+    // "...Bears" vs the Chicago Bears D/ST) — drop it from the roster.
+    const kept = matched.filter((m) => m.tagged || !nameLine || m.y0 !== nameLine.y0);
+    return {
+      matched: kept,
+      // `anchored`: the name sits above the big score, i.e. this photo
+      // shows the real matchup header rather than a guess.
+      name: nameLine ? { text: nameLine.text, anchored: scoreY0 != null && nameLine.y0 < scoreY0 } : null,
+    };
   }
 
-  // Merges one side's readings across photos, in the order the photos
-  // were picked. Consecutive screenshots of a long roster usually
-  // overlap by a row or two, so a player seen again is skipped rather
-  // than listed twice. The team name comes from the photo that actually
-  // shows the header (score line), else from the first photo.
-  function mergeSide(readings) {
-    const seen = new Set();
-    const players = [];
-    for (const r of readings) {
-      for (const p of r.players) {
-        if (seen.has(p.id)) continue;
-        seen.add(p.id);
-        players.push(p);
+  // Merges rows across photos. Consecutive screenshots of a long roster
+  // overlap by a row or two, so a row whose player was already seen is
+  // merged into the existing row (filling a side one photo missed)
+  // rather than listed twice. Starters come first, then the bench, no
+  // matter which order the photos were picked in.
+  function mergeRows(photos) {
+    // The photo showing the matchup header is the top of the roster, so
+    // it goes first even if it wasn't picked first.
+    const showsHeader = (p) => !!((p.nameA && p.nameA.anchored) || (p.nameB && p.nameB.anchored));
+    photos = [...photos].sort((p, q) => showsHeader(q) - showsHeader(p));
+    const rows = [];
+    const has = (p) => p && rows.some((r) => (r.a && r.a.id === p.id) || (r.b && r.b.id === p.id));
+    const rowWith = (p) => p && rows.find((r) => (r.a && r.a.id === p.id) || (r.b && r.b.id === p.id));
+    for (const photo of photos) {
+      for (const row of photo.rows) {
+        const existing = rowWith(row.a) || rowWith(row.b);
+        if (!existing) {
+          rows.push({ a: row.a, b: row.b, bench: row.bench });
+          continue;
+        }
+        if (!existing.a && row.a && !has(row.a)) existing.a = row.a;
+        if (!existing.b && row.b && !has(row.b)) existing.b = row.b;
+        existing.bench = existing.bench || row.bench;
       }
     }
-    const withHeader = readings.find((r) => r.hasHeader && r.nameLine);
-    const nameLine = (withHeader || readings[0] || {}).nameLine || null;
-    return { players, nameLine };
+    return [...rows.filter((r) => !r.bench), ...rows.filter((r) => r.bench)];
+  }
+
+  function pickName(names) {
+    const found = names.filter(Boolean);
+    const best = found.find((n) => n.anchored) || found[0];
+    return best ? best.text : null;
   }
 
   async function handleMatchupPhotos(files, statusEl) {
@@ -344,28 +470,23 @@
     statusEl.textContent = "Loading player list…";
     const playersDb = await ensurePlayersDb();
 
-    const readingsA = [];
-    const readingsB = [];
+    const photos = [];
     for (let i = 0; i < files.length; i++) {
       const label = files.length > 1 ? `Reading photo ${i + 1} of ${files.length}…` : "Reading photo…";
-      const { source, width: imageWidth } = await prepareImageForOcr(files[i]);
+      const { canvas } = await prepareImageForOcr(files[i]);
 
       statusEl.textContent = `${label} 0%`;
-      const ocrData = await ocrImage(source, (pct) => {
+      const ocrData = await ocrImage(canvas, (pct) => {
         statusEl.textContent = `${label} ${pct}%`;
       });
-
-      const lines = flattenOcrLines(ocrData);
-      const { left, right } = splitLinesBySide(lines, imageWidth / 2);
-      const allowNameFallback = files.length === 1;
-      readingsA.push(readSide(left, playersDb, allowNameFallback));
-      readingsB.push(readSide(right, playersDb, allowNameFallback));
+      photos.push(readPhoto(canvas, ocrData, playersDb));
     }
 
-    const { players: playersA, nameLine: nameLineA } = mergeSide(readingsA);
-    const { players: playersB, nameLine: nameLineB } = mergeSide(readingsB);
+    const rows = mergeRows(photos);
+    const countA = rows.filter((r) => r.a).length;
+    const countB = rows.filter((r) => r.b).length;
 
-    if (!playersA.length && !playersB.length) {
+    if (!countA && !countB) {
       const which = files.length > 1 ? "those photos" : "that photo";
       statusEl.textContent = `Couldn't confidently match any names in ${which} — try a clearer, less cropped screenshot.`;
       return;
@@ -376,12 +497,12 @@
       season: base.season,
       week: base.week,
       teamA: {
-        name: (nameLineA && nameLineA.text) || base.teamA.name,
-        players: playersA.length ? playersA.map(toMatchupPlayer) : base.teamA.players,
+        name: pickName(photos.map((p) => p.nameA)) || base.teamA.name,
+        players: rows.map((r) => toMatchupPlayer(r.a, r.bench)),
       },
       teamB: {
-        name: (nameLineB && nameLineB.text) || base.teamB.name,
-        players: playersB.length ? playersB.map(toMatchupPlayer) : base.teamB.players,
+        name: pickName(photos.map((p) => p.nameB)) || base.teamB.name,
+        players: rows.map((r) => toMatchupPlayer(r.b, r.bench)),
       },
     };
 
@@ -392,7 +513,10 @@
     shareInput.value = buildShareUrl(matchup);
     qs("#share-link-box").hidden = false;
 
-    statusEl.textContent = `Applied — found ${playersA.length} on the left, ${playersB.length} on the right.`;
+    const benchCount = rows.filter((r) => r.bench).length;
+    statusEl.textContent =
+      `Applied — found ${countA} on the left, ${countB} on the right ` +
+      `(${rows.length - benchCount} starter rows, ${benchCount} bench).`;
   }
 
   function initMatchupPhotoInput() {
