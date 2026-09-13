@@ -46,11 +46,13 @@ function pointsAllowedTierPts(pointsAllowed) {
   return -4;
 }
 
-// Sleeper reports `td` as every TD scored by the D/ST unit (return TDs
-// included) and `def_td` as just the defensive subset (INT/fumble return),
-// so the special-teams TD count is the difference between the two.
+// Sleeper's team-defense `td` is NOT a D/ST stat — it's every touchdown
+// the team's offense scored (e.g. SEA's 13 points in 2026 week 1 = 1 TD +
+// 2 FG showed as td: 1), so counting it gave defenses a phantom 6 points
+// per offensive TD. Defensive TDs (INT/fumble returns) are `def_td`, and
+// kick/punt return TDs are `def_st_td`.
 function specialTeamsTds(s) {
-  return Math.max((s.td || 0) - (s.def_td || 0), 0);
+  return s.def_st_td || 0;
 }
 
 function calcDefensePoints(s) {
