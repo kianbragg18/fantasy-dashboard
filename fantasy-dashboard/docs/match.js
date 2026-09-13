@@ -153,7 +153,7 @@ function cleanLineText(raw) {
     // OCR regularly drops the space in a bold all-caps "T. LAWRENCE",
     // reading one word "T.LAWRENCE" that no longer looks like an
     // initial + last name, and likewise glues a suffix on ("BURDENIII").
-    .replace(/\b([A-Z])\.(?=[A-Z]{2})/g, "$1. ")
+    .replace(/\b([A-Za-z])\.(?=[A-Za-z]{2})/g, "$1. ") // also "J.LovE" — OCR mixes case too
     .replace(/\b([A-Z]{3,})(III|JR|SR)\b/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();

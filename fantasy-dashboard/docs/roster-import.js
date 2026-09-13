@@ -152,6 +152,7 @@
   // beforeY0 == null (neither anchor found) falls back to topmost.
   function pickTeamNameLine(sideLines, beforeY0) {
     const candidates = sideLines
+      .filter((l) => !looksLikeTagLine(l.text))
       .map((l) => ({ text: cleanLineText(l.text), y0: l.y0 }))
       .filter((l) => l.text.length >= 3 && l.text.length <= 40)
       .filter((l) => /[a-zA-Z]{2,}/.test(l.text)) // must have a real word, not just a clock/icon
@@ -288,10 +289,14 @@
       let player = matches.length && matches[0].score >= AUTO_ACCEPT_MIN_SCORE ? matches[0].player : null;
       if (!player && teamHint) player = matchInitialOnTeam(line, teamHint, playersDb);
       if (player) {
-        // `tagged`: the team code under this line agrees with the match,
-        // which is strong evidence it's a real roster row — used to keep
-        // such a line from being mistaken for a team name.
-        matched.push({ player, y0, y1, tagged: player.team === teamHint });
+        // `tagged`: this line is clearly a roster row — a team code sits
+        // under it (a team name has a score under it instead) or the name
+        // matched near-exactly. Such a line must never be taken for the
+        // team name: the header's score can misread (e.g. "13.00" as
+        // "1300"), moving the name search down to the first player row,
+        // which then "wins" as the team name and drops that player.
+        const strong = matches.length && matches[0].player === player && matches[0].score >= 0.9;
+        matched.push({ player, y0, y1, tagged: !!teamHint || !!strong });
       }
     }
     return matched;
@@ -300,17 +305,22 @@
   // Fallback for an "X. LASTNAME" line whose surname OCR mangled past
   // the fuzzy matcher's bar: the team code read under it narrows the
   // field to one NFL roster, where the initial plus a loose surname
-  // match is enough to be sure.
+  // match is enough to be sure. Also covers the period being dropped so
+  // the initial is glued on ("JLOVED)" for "J. LOVE" + injury badge) —
+  // there the surname has to be a clean prefix, since there's no word
+  // boundary to trust.
   function matchInitialOnTeam(line, team, playersDb) {
     const words = normalize(line).split(" ");
-    if (words.length < 2 || words[0].length !== 1) return null;
-    const initial = words[0];
-    const rest = words.slice(1).join("");
+    if (!words[0]) return null;
+    const spaced = words.length >= 2 && words[0].length === 1;
+    const initial = words[0][0];
+    const rest = spaced ? words.slice(1).join("") : words.join("").slice(1);
+    if (rest.length < 3) return null;
     let best = null;
     for (const p of playersDb) {
       if (p.team !== team || !p.firstNorm.startsWith(initial) || !p.lastNorm) continue;
       const last = p.lastNorm.replace(/ /g, "");
-      const sim = rest.startsWith(last) ? 1 : similarity(rest, last);
+      const sim = spaced ? (rest.startsWith(last) ? 1 : similarity(rest, last)) : last.length >= 4 && rest.startsWith(last) ? 1 : 0;
       if (sim >= 0.7 && (!best || sim > best.sim)) best = { p, sim };
     }
     return best ? best.p : null;
