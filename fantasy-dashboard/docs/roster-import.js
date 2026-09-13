@@ -1,7 +1,9 @@
 // ── "Set rosters from a photo" panel ─────────────────────────────────
-// Runs OCR on a single uploaded matchup screenshot (client-side, via
+// Runs OCR on one or more uploaded matchup screenshots (client-side, via
 // Tesseract.js — nothing is uploaded anywhere) showing both rosters
 // side by side — your team on the left, your opponent's on the right.
+// A roster too long for one screen can be split across several shots;
+// their players are merged in order with duplicates dropped.
 // Each detected line is bucketed to a side by its horizontal position
 // in the photo, fuzzy-matched against Sleeper's player list, and the
 // roster is applied automatically from the best match — no manual
@@ -299,38 +301,73 @@
     el.hidden = false;
   }
 
-  async function handleMatchupPhoto(file, statusEl) {
+  // Reads one side of one photo. `allowNameFallback` controls whether a
+  // team name may be guessed without the big score line to anchor on:
+  // fine for a single photo, but a scrolled-down continuation shot has
+  // no header at all, so the "topmost line" fallback would claim (and
+  // drop) whichever player happens to sit at the top of it.
+  function readSide(sideLines, playersDb, allowNameFallback) {
+    const matched = playersForSide(sideLines, playersDb);
+    const scoreY0 = findScoreLineY0(sideLines);
+    const firstY0 = matched.length ? Math.min(...matched.map((m) => m.y0)) : null;
+    const nameLine =
+      scoreY0 != null || allowNameFallback ? pickTeamNameLine(sideLines, scoreY0 ?? firstY0) : null;
+    // A team name occasionally scores well enough against the player
+    // list to slip into `matched` itself (see playersForSide) — drop it
+    // from the roster now that it's been claimed as the team name.
+    const players = matched.filter((m) => !nameLine || m.y0 !== nameLine.y0).map((m) => m.player);
+    return { players, nameLine, hasHeader: scoreY0 != null };
+  }
+
+  // Merges one side's readings across photos, in the order the photos
+  // were picked. Consecutive screenshots of a long roster usually
+  // overlap by a row or two, so a player seen again is skipped rather
+  // than listed twice. The team name comes from the photo that actually
+  // shows the header (score line), else from the first photo.
+  function mergeSide(readings) {
+    const seen = new Set();
+    const players = [];
+    for (const r of readings) {
+      for (const p of r.players) {
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        players.push(p);
+      }
+    }
+    const withHeader = readings.find((r) => r.hasHeader && r.nameLine);
+    const nameLine = (withHeader || readings[0] || {}).nameLine || null;
+    return { players, nameLine };
+  }
+
+  async function handleMatchupPhotos(files, statusEl) {
     qs("#detected-rosters").hidden = true;
     statusEl.textContent = "Loading player list…";
     const playersDb = await ensurePlayersDb();
 
-    const { source, width: imageWidth } = await prepareImageForOcr(file);
+    const readingsA = [];
+    const readingsB = [];
+    for (let i = 0; i < files.length; i++) {
+      const label = files.length > 1 ? `Reading photo ${i + 1} of ${files.length}…` : "Reading photo…";
+      const { source, width: imageWidth } = await prepareImageForOcr(files[i]);
 
-    statusEl.textContent = "Reading photo… 0%";
-    const ocrData = await ocrImage(source, (pct) => {
-      statusEl.textContent = `Reading photo… ${pct}%`;
-    });
+      statusEl.textContent = `${label} 0%`;
+      const ocrData = await ocrImage(source, (pct) => {
+        statusEl.textContent = `${label} ${pct}%`;
+      });
 
-    const lines = flattenOcrLines(ocrData);
-    const { left, right } = splitLinesBySide(lines, imageWidth / 2);
+      const lines = flattenOcrLines(ocrData);
+      const { left, right } = splitLinesBySide(lines, imageWidth / 2);
+      const allowNameFallback = files.length === 1;
+      readingsA.push(readSide(left, playersDb, allowNameFallback));
+      readingsB.push(readSide(right, playersDb, allowNameFallback));
+    }
 
-    const matchedA = playersForSide(left, playersDb);
-    const matchedB = playersForSide(right, playersDb);
-    const firstY0A = matchedA.length ? Math.min(...matchedA.map((m) => m.y0)) : null;
-    const firstY0B = matchedB.length ? Math.min(...matchedB.map((m) => m.y0)) : null;
-    const boundaryA = findScoreLineY0(left) ?? firstY0A;
-    const boundaryB = findScoreLineY0(right) ?? firstY0B;
-
-    const nameLineA = pickTeamNameLine(left, boundaryA);
-    const nameLineB = pickTeamNameLine(right, boundaryB);
-    // A team name occasionally scores well enough against the player
-    // list to slip into `matched` itself (see playersForSide) — drop it
-    // from the roster now that it's been claimed as the team name.
-    const playersA = matchedA.filter((m) => !nameLineA || m.y0 !== nameLineA.y0).map((m) => m.player);
-    const playersB = matchedB.filter((m) => !nameLineB || m.y0 !== nameLineB.y0).map((m) => m.player);
+    const { players: playersA, nameLine: nameLineA } = mergeSide(readingsA);
+    const { players: playersB, nameLine: nameLineB } = mergeSide(readingsB);
 
     if (!playersA.length && !playersB.length) {
-      statusEl.textContent = "Couldn't confidently match any names in that photo — try a clearer, less cropped screenshot.";
+      const which = files.length > 1 ? "those photos" : "that photo";
+      statusEl.textContent = `Couldn't confidently match any names in ${which} — try a clearer, less cropped screenshot.`;
       return;
     }
 
@@ -363,12 +400,17 @@
     const statusEl = qs("#matchup-scan-status");
 
     fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
-      if (!file) return;
-      handleMatchupPhoto(file, statusEl).catch((err) => {
-        console.error(err);
-        statusEl.textContent = "Something went wrong reading that photo — try again with a clearer screenshot.";
-      });
+      const files = Array.from(fileInput.files);
+      if (!files.length) return;
+      handleMatchupPhotos(files, statusEl)
+        .catch((err) => {
+          console.error(err);
+          statusEl.textContent = "Something went wrong reading that photo — try again with a clearer screenshot.";
+        })
+        .finally(() => {
+          // Lets the same photo(s) be picked again and still fire "change".
+          fileInput.value = "";
+        });
     });
   }
 
